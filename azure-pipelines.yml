@@ -1,0 +1,127 @@
+# Builds, tests and packages the M.I.T.R.A.M VS Code extension.
+#
+# Every push to the main branch (and every manual run) installs, type-checks, tests and builds the
+# extension and publishes the .vsix as a pipeline artifact. Publishing to the VS Code Marketplace
+# is a separate stage that only runs when you ask for it; see docs/RELEASING.md.
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+
+pr: none # for Azure Repos, validate pull requests with a branch policy that runs this pipeline
+
+parameters:
+  - name: publish
+    displayName: Publish to the VS Code Marketplace (main/master only)
+    type: boolean
+    default: false
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  npm_config_cache: $(Pipeline.Workspace)/.npm
+
+stages:
+  - stage: Build
+    displayName: Build and test
+    jobs:
+      - job: build
+        displayName: Install, test, package
+        timeoutInMinutes: 20
+        steps:
+          - task: NodeTool@0
+            displayName: Use Node 22
+            inputs:
+              versionSpec: 22.x
+
+          - task: Cache@2
+            displayName: Cache npm downloads
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json | webview-ui/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: $(npm_config_cache)
+
+          # `npm ci` installs exactly what the lockfiles say and fails if they are out of date.
+          - script: npm ci
+            displayName: Install (extension)
+          - script: npm ci
+            displayName: Install (webview)
+            workingDirectory: webview-ui
+
+          - script: npm run typecheck
+            displayName: Type-check
+
+          # Unit tests only. They never call a model. (`npm run eval` does, and is not run here.)
+          - script: >
+              npx vitest run --coverage
+              --coverage.reporter=text --coverage.reporter=cobertura
+              --reporter=default --reporter=junit --outputFile.junit=test-results/junit.xml
+            displayName: Test with coverage
+
+          - task: PublishTestResults@2
+            displayName: Publish test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: test-results/junit.xml
+              testRunTitle: M.I.T.R.A.M unit tests
+
+          - task: PublishCodeCoverageResults@2
+            displayName: Publish coverage
+            condition: succeededOrFailed()
+            inputs:
+              summaryFileLocation: coverage/cobertura-coverage.xml
+
+          # Runs the production build (minified, no source maps) and packs the .vsix.
+          - script: npm run package
+            displayName: Package the extension
+
+          - task: CopyFiles@2
+            displayName: Stage the .vsix
+            inputs:
+              contents: '*.vsix'
+              targetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish the .vsix as an artifact
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: vsix
+
+  - stage: Publish
+    displayName: Publish to the Marketplace
+    dependsOn: Build
+    condition: >
+      and(succeeded(),
+          eq('${{ parameters.publish }}', 'true'),
+          in(variables['Build.SourceBranch'], 'refs/heads/main', 'refs/heads/master'))
+    jobs:
+      - deployment: publish
+        displayName: vsce publish
+        # Create this environment (Pipelines > Environments) and add an "Approvals" check to it,
+        # so a person has to approve every release.
+        environment: vscode-marketplace
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: NodeTool@0
+                  displayName: Use Node 22
+                  inputs:
+                    versionSpec: 22.x
+
+                # VSCE_PAT is a secret pipeline variable you create (Marketplace > Manage scope).
+                # Secrets are not passed to scripts automatically, so it is mapped in explicitly,
+                # which also keeps the token off the command line and out of the logs.
+                - script: |
+                    set -euo pipefail
+                    vsix="$(ls "$(Pipeline.Workspace)"/vsix/*.vsix | head -n 1)"
+                    echo "Publishing $vsix"
+                    npx --yes @vscode/vsce publish --packagePath "$vsix"
+                  displayName: Publish the .vsix
+                  env:
+                    VSCE_PAT: $(VSCE_PAT)

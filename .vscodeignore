@@ -20,3 +20,6 @@ dist/evals.js
 **/*.map
 **/*.ts
 *.vsix
+azure-pipelines.yml
+coverage/**
+test-results/**
