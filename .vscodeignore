@@ -2,6 +2,8 @@
 src/**
 test/**
 sandbox/**
+scripts/**
+media/logo.svg
 docs/**
 node_modules/**
 webview-ui/src/**
@@ -18,3 +20,7 @@ dist/evals.js
 **/*.map
 **/*.ts
 *.vsix
+azure-pipelines.yml
+coverage/**
+test-results/**
+media/screenshots/**

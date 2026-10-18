@@ -4,3 +4,5 @@ webview-ui/dist/
 *.vsix
 .vscode-test/
 test/evals/results/
+coverage/
+test-results/
