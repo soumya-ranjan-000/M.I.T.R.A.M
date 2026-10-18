@@ -3,6 +3,7 @@ src/**
 test/**
 sandbox/**
 scripts/**
+media/logo.svg
 docs/**
 node_modules/**
 webview-ui/src/**

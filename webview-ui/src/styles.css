@@ -56,7 +56,7 @@ kbd {
 .msg-header.user { color: var(--vscode-descriptionForeground); }
 .avatar { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; }
 .avatar.user { background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
-.avatar.assistant { color: #fff; background: linear-gradient(135deg, #3b82f6, #1d3a96); border-radius: 7px; }
+.avatar.assistant { overflow: hidden; background: linear-gradient(160deg, #1e1b4b, #0b1020); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 
 .bubble {
   padding: 10px 12px; border-radius: var(--radius); white-space: pre-wrap; word-break: break-word; line-height: 1.5;
