@@ -24,6 +24,54 @@ It talks to **Claude on Azure AI Foundry** using your own endpoint and API key. 
 
 In the message box: type `@` to attach a file, `/` for commands (`/new`, `/undo`, `/plan`, `/model`). The current file or selection is attached automatically; untick the chip above the box to stop that.
 
+## Feature tour
+
+### A chat that works on your project
+Ask about your code or ask for a change. The current file is attached automatically, and the model's reasoning is shown while it works.
+
+<p align="center"><img src="media/screenshots/01-welcome.png" alt="The welcome screen of the chat panel" width="360"></p>
+
+### It reads before it answers
+The agent searches and reads your files (and your editor's error list) before it replies, and each step is shown as a card you can expand.
+
+<p align="center"><img src="media/screenshots/02-understand-code.png" alt="The agent reasoning, searching and reading files, then answering" width="360"></p>
+
+### You approve every change
+Edits and commands wait for you. **View diff** opens VS Code's diff editor on the exact change, and **Allow**, **Always allow** or **Reject** decide what happens next.
+
+<p align="center"><img src="media/screenshots/03-approval.png" alt="An edit waiting for approval with View diff, Allow, Always allow and Reject" width="360"></p>
+
+### Plan mode
+Turn on **Plan** (or type `/plan`) and the agent only investigates and proposes a plan. Nothing is changed until you press **Execute plan**.
+
+<p align="center"><img src="media/screenshots/05-plan-mode.png" alt="A proposed plan with Execute plan and Keep planning buttons" width="360"></p>
+
+### A plan board for long tasks
+For big jobs the agent keeps a board of tasks (to do, in progress, done, blocked) and notes. It re-reads the board on every step, so it always knows what is finished and what is left.
+
+<p align="center"><img src="media/screenshots/04-plan-board.png" alt="The plan board showing two tasks done, one in progress, one pending and one blocked" width="360"></p>
+
+### Continue and revert
+A long run pauses after a step or time limit and shows **Continue**. A turn that changed files shows **Revert changes**, and the context bar shows how much of the model's window is used and how much came from cache.
+
+<p align="center"><img src="media/screenshots/06-continue-revert.png" alt="A paused run with a Continue button and a Revert changes bar" width="360"></p>
+
+### Live feedback while it works
+The message box glows and a status line shows the current step, so you always know whether the agent is working or waiting for you. Press **Esc** or the stop button to cancel.
+
+<p align="center"><img src="media/screenshots/10-working.png" alt="The message box glowing while the agent runs a command" width="360"></p>
+
+### Slash commands and file attachments
+Type `/` for commands and `@` to attach files.
+
+<p align="center"><img src="media/screenshots/07-slash-commands.png" alt="The slash command menu" width="300">&nbsp;&nbsp;<img src="media/screenshots/08-attach-files.png" alt="The @ file picker" width="300"></p>
+
+### Chat history
+Every chat is saved on your machine. Use the history button to switch between them, or **+** to start a new one.
+
+<p align="center"><img src="media/screenshots/09-history.png" alt="The chat history menu" width="360"></p>
+
+
 ## Long tasks
 
 For work with many steps, the agent keeps a **plan board**, shown above the message box with each task marked to do, in progress, done or blocked. The board is shown to the agent again at the end of every request, outside the saved conversation, so it always sees the current plan even after old messages are trimmed. It also keeps short notes there (findings, decisions, the command that runs the tests). The board is saved with the chat. Use the **×** on the panel to clear it.
