@@ -88,7 +88,9 @@ npm run test:coverage
 npm run package       # build a .vsix
 ```
 
-Press **F5** in this folder to launch a development window (it opens `sandbox/` and disables your other extensions).
+Press **F5** in this folder to launch a development window with the debugger (it opens `sandbox/` and disables your other extensions).
+
+If the development window's extension host crashes on F5 (exit code 134 in VS Code's `main.log`), start it without the debugger instead: `npm run dev`, or the **Dev window (no debugger)** task. You lose breakpoints, nothing else.
 
 `npm run eval -- --yes` runs 29 end-to-end tasks (including five longer multi-step ones, such as building a module plus a CLI against an existing test, and a change that only the tests reveal is broken) against **your** model and records a pass rate (set `MITRAM_ENDPOINT`, `MITRAM_API_KEY`, and optionally `MITRAM_MODEL`). It spends tokens, so it refuses to start without `--yes`.
 

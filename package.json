@@ -179,7 +179,8 @@
     "test:coverage": "vitest run --coverage",
     "build:prod": "node esbuild.js --production && npm --prefix webview-ui run build",
     "vscode:prepublish": "npm run build:prod",
-    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license",
+    "dev": "node scripts/dev.js"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

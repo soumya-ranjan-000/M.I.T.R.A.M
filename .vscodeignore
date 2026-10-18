@@ -2,6 +2,7 @@
 src/**
 test/**
 sandbox/**
+scripts/**
 docs/**
 node_modules/**
 webview-ui/src/**

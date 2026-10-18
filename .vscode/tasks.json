@@ -1,6 +1,22 @@
 {
   "version": "2.0.0",
   "tasks": [
-    { "label": "build", "type": "npm", "script": "build", "problemMatcher": [] }
+    {
+      "label": "build",
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev window (no debugger)",
+      "type": "shell",
+      "command": "npm run dev",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "detail": "Builds, then opens an Extension Development Window without attaching the debugger (more reliable than F5 here)."
+    }
   ]
 }
