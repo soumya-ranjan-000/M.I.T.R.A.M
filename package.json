@@ -1,0 +1,212 @@
+{
+  "name": "mitram",
+  "displayName": "M.I.T.R.A.M",
+  "description": "A standalone AI coding agent with chat and tool use.",
+  "version": "0.1.0",
+  "publisher": "mitram",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mitram",
+          "title": "M.I.T.R.A.M",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "mitram": [
+        {
+          "type": "webview",
+          "id": "mitram.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "mitram.focusChat",
+        "title": "M.I.T.R.A.M: Focus Chat"
+      },
+      {
+        "command": "mitram.newChat",
+        "title": "M.I.T.R.A.M: New Chat"
+      },
+      {
+        "command": "mitram.setApiKey",
+        "title": "M.I.T.R.A.M: Set API Key"
+      },
+      {
+        "command": "mitram.clearApiKey",
+        "title": "M.I.T.R.A.M: Clear API Key"
+      },
+      {
+        "command": "mitram.initProjectInstructions",
+        "title": "M.I.T.R.A.M: Create Project Instructions (MITRAM.md)"
+      },
+      {
+        "command": "mitram.showLogs",
+        "title": "M.I.T.R.A.M: Show Logs"
+      },
+      {
+        "command": "mitram.copyDiagnostics",
+        "title": "M.I.T.R.A.M: Copy Diagnostics for Bug Report"
+      }
+    ],
+    "configuration": {
+      "title": "M.I.T.R.A.M",
+      "properties": {
+        "mitram.endpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Azure AI Foundry endpoint for Claude, e.g. https://<resource>.services.ai.azure.com/anthropic/"
+        },
+        "mitram.model": {
+          "type": "string",
+          "default": "claude-opus-5-5",
+          "description": "Model or deployment name on your Foundry resource."
+        },
+        "mitram.maxTokens": {
+          "type": "number",
+          "default": 16000,
+          "description": "Maximum tokens per response."
+        },
+        "mitram.maxIterations": {
+          "type": "number",
+          "default": 60,
+          "description": "Maximum model/tool steps for one message. When reached, the agent pauses and offers a Continue button."
+        },
+        "mitram.autoApproveEdits": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Apply `edit_file` and `create_file` without asking. Use **Revert changes** to undo a turn. Off by default."
+        },
+        "mitram.autoApproveSafeCommands": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run a tiny set of read-only commands (`pwd`, `ls`, `git status/diff/log/show`) without asking. Every other command always asks. Off by default."
+        },
+        "mitram.blockedCommandPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra regular expressions. A command matching any of them is blocked without asking, e.g. `terraform\\\\s+destroy`."
+        },
+        "mitram.contextWindow": {
+          "type": "number",
+          "default": 200000,
+          "description": "Your model deployment's context window in tokens. Older context is trimmed when the conversation passes about 70% of it."
+        },
+        "mitram.promptCaching": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cache the system prompt, tools and conversation prefix to cut cost and latency. Turn this off if your deployment rejects cache_control."
+        },
+        "mitram.includeEnvironment": {
+          "type": "boolean",
+          "default": true,
+          "description": "Send open tabs, the git branch and diff summary, and current errors with each message."
+        },
+        "mitram.autoApproveCommands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Commands that run without asking. Each entry is a regular expression that must match the **whole** command, e.g. `npm test`, `python3? hello\\\\.py` or `npm run (lint|build)`. Commands containing `;`, `&`, `|`, `>`, `<`, backticks or `$(` always ask, and blocked commands stay blocked."
+        },
+        "mitram.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra model or deployment names to offer in the model picker (the /model command or the model chip above the composer)."
+        },
+        "mitram.showReasoning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the model's reasoning summary while it works. If your deployment doesn't support it, M.I.T.R.A.M falls back automatically."
+        },
+        "mitram.maxRunMinutes": {
+          "type": "number",
+          "default": 20,
+          "description": "Pause a run after this many minutes (0 for no limit). A Continue button resumes it."
+        },
+        "mitram.verifyBeforeDone": {
+          "type": "boolean",
+          "default": true,
+          "description": "Before finishing, make the agent check files it changed (run tests, build or linter) and finish the tasks on its board. It is reminded at most twice."
+        },
+        "mitram.summarizeContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a long conversation nears the context limit, replace the oldest part with a short model-written summary instead of dropping it. Uses one extra model request."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "mitram.focusChat",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m"
+      }
+    ]
+  },
+  "scripts": {
+    "build:ext": "node esbuild.js",
+    "build:ui": "npm --prefix webview-ui run build",
+    "build": "npm run build:ext && npm run build:ui",
+    "watch:ext": "node esbuild.js --watch",
+    "watch:ui": "npm --prefix webview-ui run watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "install:all": "npm install && npm --prefix webview-ui install",
+    "eval:build": "esbuild test/evals/run.ts --bundle --platform=node --target=node20 --outfile=dist/evals.js --log-level=warning",
+    "eval": "npm run eval:build && node dist/evals.js",
+    "test:coverage": "vitest run --coverage",
+    "build:prod": "node esbuild.js --production && npm --prefix webview-ui run build",
+    "vscode:prepublish": "npm run build:prod",
+    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/vscode": "1.90.0",
+    "@vitest/coverage-v8": "^5.0.5",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@anthropic-ai/foundry-sdk": "^0.6.0",
+    "@anthropic-ai/sdk": "^0.135.0"
+  },
+  "icon": "media/icon.png",
+  "keywords": [
+    "ai",
+    "agent",
+    "coding agent",
+    "chat",
+    "claude",
+    "azure",
+    "foundry",
+    "assistant"
+  ],
+  "galleryBanner": {
+    "color": "#1d3a96",
+    "theme": "dark"
+  }
+}

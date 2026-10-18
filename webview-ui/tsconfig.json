@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "vite.config.ts", "../src/webview/protocol.ts", "../src/webview/displayReducer.ts", "../src/webview/slashCommands.ts", "../src/webview/activity.ts", "../src/agent/board.ts"]
+}

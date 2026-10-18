@@ -1,0 +1,20 @@
+# Everything not needed at runtime stays out of the package.
+src/**
+test/**
+sandbox/**
+docs/**
+node_modules/**
+webview-ui/src/**
+webview-ui/node_modules/**
+webview-ui/*.json
+webview-ui/*.ts
+.vscode/**
+.gitignore
+PLAN.md
+esbuild.js
+tsconfig.json
+vitest.config.ts
+dist/evals.js
+**/*.map
+**/*.ts
+*.vsix
