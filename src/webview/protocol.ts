@@ -73,8 +73,17 @@ export interface RawImage {
   data: string;
 }
 
+/** A file the pre-analysis search attached to a message, and the lines it pointed at. */
+export interface RetrievedRef {
+  path: string;
+  startLine: number;
+  endLine: number;
+}
+
 export type DisplayMessage =
   | { role: 'user'; text: string; images?: ImageAttachment[]; files?: FileAttachment[] }
+  /** Files the extension's own search attached to the message above, before the model ran. */
+  | { role: 'retrieved'; files: RetrievedRef[] }
   | { role: 'assistant'; text: string }
   | { role: 'thinking'; text: string }
   | {
@@ -121,6 +130,7 @@ export type WebviewToHost =
   | { type: 'searchFiles'; query: string }
   | { type: 'approval'; id: string; decision: ApprovalDecision }
   | { type: 'viewDiff'; id: string }
+  | { type: 'openFile'; path: string; line: number }
   | { type: 'revert' }
   | { type: 'pickModel' }
   | { type: 'clearBoard' }
@@ -140,6 +150,7 @@ export type HostToWebview =
   | { type: 'toolUpdate'; id: string; status: ToolStatus; output?: string }
   | { type: 'toolAllowRule'; id: string; label: string; usesShell: boolean }
   | { type: 'notice'; text: string }
+  | { type: 'retrieved'; files: RetrievedRef[] }
   | { type: 'checkpoint'; files: string[] }
   | { type: 'modelInfo'; model: string }
   | { type: 'board'; board: Board }
@@ -252,6 +263,9 @@ export function isWebviewToHost(value: unknown): value is WebviewToHost {
       base64Bytes(v.data) <= MAX_UPLOAD_BYTES &&
       BASE64.test(v.data)
     );
+  }
+  if (v.type === 'openFile') {
+    return typeof v.path === 'string' && v.path.length <= 1024 && Number.isInteger(v.line) && (v.line as number) >= 1;
   }
   if (v.type === 'approval') {
     return typeof v.id === 'string' && (v.decision === 'approve' || v.decision === 'reject' || v.decision === 'always');

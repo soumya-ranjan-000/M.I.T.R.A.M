@@ -17,6 +17,7 @@ esbuild.js
 tsconfig.json
 vitest.config.ts
 dist/evals.js
+dist/retrieval-bench.js
 **/*.map
 **/*.ts
 *.vsix

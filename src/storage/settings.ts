@@ -6,6 +6,7 @@ export interface MitramSettings {
   models: string[];
   maxTokens: number;
   maxIterations: number;
+  skipApprovalPrompts: boolean;
   autoApproveEdits: boolean;
   autoApproveSafeCommands: boolean;
   blockedCommandPatterns: string[];
@@ -13,6 +14,7 @@ export interface MitramSettings {
   contextWindow: number;
   promptCaching: boolean;
   includeEnvironment: boolean;
+  retrieveContext: boolean;
   showReasoning: boolean;
   maxRunMinutes: number;
   verifyBeforeDone: boolean;
@@ -27,6 +29,7 @@ export function readSettings(): MitramSettings {
     models: cfg.get<string[]>('models', []),
     maxTokens: cfg.get<number>('maxTokens', 16000),
     maxIterations: Math.max(1, cfg.get<number>('maxIterations', 60)),
+    skipApprovalPrompts: cfg.get<boolean>('skipApprovalPrompts', false),
     autoApproveEdits: cfg.get<boolean>('autoApproveEdits', false),
     autoApproveSafeCommands: cfg.get<boolean>('autoApproveSafeCommands', false),
     blockedCommandPatterns: cfg.get<string[]>('blockedCommandPatterns', []),
@@ -34,6 +37,7 @@ export function readSettings(): MitramSettings {
     contextWindow: Math.max(8000, cfg.get<number>('contextWindow', 200000)),
     promptCaching: cfg.get<boolean>('promptCaching', true),
     includeEnvironment: cfg.get<boolean>('includeEnvironment', true),
+    retrieveContext: cfg.get<boolean>('retrieveContext', true),
     showReasoning: cfg.get<boolean>('showReasoning', true),
     maxRunMinutes: Math.max(0, cfg.get<number>('maxRunMinutes', 20)),
     verifyBeforeDone: cfg.get<boolean>('verifyBeforeDone', true),

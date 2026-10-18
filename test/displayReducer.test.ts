@@ -14,6 +14,12 @@ describe('applyHostEvent', () => {
     expect(m.map((x) => x.role)).toEqual(['user', 'assistant', 'tool', 'assistant']);
   });
 
+  it('adds the files the search attached as their own entry', () => {
+    const files = [{ path: 'src/a.ts', startLine: 3, endLine: 22 }];
+    const m = applyHostEvent([{ role: 'user', text: 'hi' }], { type: 'retrieved', files });
+    expect(m).toEqual([{ role: 'user', text: 'hi' }, { role: 'retrieved', files }]);
+  });
+
   it('updates a tool card by id', () => {
     let m = applyHostEvent([], { type: 'toolStart', id: 't', name: 'run_command', summary: 'Run', status: 'pending' });
     m = applyHostEvent(m, { type: 'toolUpdate', id: 't', status: 'ok', output: 'done' });

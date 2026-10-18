@@ -14,6 +14,7 @@ describe('isWebviewToHost', () => {
     expect(isWebviewToHost({ type: 'searchFiles', query: 'ab' })).toBe(true);
     expect(isWebviewToHost({ type: 'insertCode', code: 'x' })).toBe(true);
     expect(isWebviewToHost({ type: 'approval', id: 't', decision: 'always' })).toBe(true);
+    expect(isWebviewToHost({ type: 'openFile', path: 'src/a.ts', line: 12 })).toBe(true);
   });
 
   it('rejects malformed input', () => {
@@ -29,6 +30,10 @@ describe('isWebviewToHost', () => {
     expect(isWebviewToHost({ type: 'deleteSession', id: 5 })).toBe(false);
     expect(isWebviewToHost({ type: 'approval', id: 't', decision: 'maybe' })).toBe(false);
     expect(isWebviewToHost({ type: 'approval', decision: 'approve' })).toBe(false);
+    expect(isWebviewToHost({ type: 'openFile', path: 'src/a.ts' })).toBe(false);
+    expect(isWebviewToHost({ type: 'openFile', path: 'src/a.ts', line: 0 })).toBe(false);
+    expect(isWebviewToHost({ type: 'openFile', path: 'src/a.ts', line: 1.5 })).toBe(false);
+    expect(isWebviewToHost({ type: 'openFile', path: 'x'.repeat(2000), line: 1 })).toBe(false);
   });
 });
 

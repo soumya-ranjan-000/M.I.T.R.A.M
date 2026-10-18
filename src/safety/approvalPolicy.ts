@@ -1,6 +1,7 @@
 import { CommandRule, hasShellSyntax, isSafeReadOnlyCommand, matchesRule } from './commandPolicy';
 
 export interface ApprovalSettings {
+  skipApprovalPrompts: boolean;
   autoApproveEdits: boolean;
   autoApproveSafeCommands: boolean;
   /** Commands matching one of these (as a whole) run without asking. */
@@ -20,6 +21,13 @@ export function isAutoApproved(
   alwaysAllowed: ReadonlySet<string>,
 ): boolean {
   if (alwaysAllowed.has(toolName)) return true;
+
+  if (settings.skipApprovalPrompts) {
+    if (toolName === 'edit_file' || toolName === 'create_file') return true;
+    if (toolName === 'run_command') {
+      return !!String((input as { command?: unknown } | null)?.command ?? '').trim();
+    }
+  }
 
   if (toolName === 'edit_file' || toolName === 'create_file') return settings.autoApproveEdits;
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ApprovalSettings, isAutoApproved } from '../src/safety/approvalPolicy';
 import { compileAnchoredPatterns } from '../src/safety/commandPolicy';
 
-const off: ApprovalSettings = { autoApproveEdits: false, autoApproveSafeCommands: false, autoApproveCommands: [], allowedCommands: [] };
+const off: ApprovalSettings = { skipApprovalPrompts: false, autoApproveEdits: false, autoApproveSafeCommands: false, autoApproveCommands: [], allowedCommands: [] };
 const cmd = (command: string) => ({ command });
 const none = new Set<string>();
 
@@ -11,6 +11,15 @@ describe('isAutoApproved', () => {
     expect(isAutoApproved('edit_file', {}, off, none)).toBe(false);
     expect(isAutoApproved('create_file', {}, off, none)).toBe(false);
     expect(isAutoApproved('run_command', cmd('ls'), off, none)).toBe(false);
+  });
+
+  it('skips prompts for edits and non-empty commands when enabled, but not unknown tools', () => {
+    const on = { ...off, skipApprovalPrompts: true };
+    expect(isAutoApproved('edit_file', {}, on, none)).toBe(true);
+    expect(isAutoApproved('create_file', {}, on, none)).toBe(true);
+    expect(isAutoApproved('run_command', cmd('npm test && npm run build'), on, none)).toBe(true);
+    expect(isAutoApproved('run_command', cmd('  '), on, none)).toBe(false);
+    expect(isAutoApproved('format_disk', {}, on, none)).toBe(false);
   });
 
   it('auto-approves edits and creates only when enabled, and never commands because of it', () => {

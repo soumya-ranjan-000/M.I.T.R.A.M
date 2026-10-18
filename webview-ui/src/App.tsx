@@ -12,6 +12,7 @@ import { Header } from './components/Header';
 import { Icon } from './components/Icon';
 import { Markdown } from './components/Markdown';
 import { PinnedRequest } from './components/PinnedRequest';
+import { RetrievedCard } from './components/RetrievedCard';
 import { ThinkingBlock } from './components/ThinkingBlock';
 import { ToolCard } from './components/ToolCard';
 import { Usage } from './components/UsageBar';
@@ -336,6 +337,7 @@ export function App() {
                 )}
                 {m.role === 'thinking' && <ThinkingBlock text={m.text} live={busy && m === messages[messages.length - 1]} />}
                 {m.role === 'tool' && <ToolCard tool={m} />}
+                {m.role === 'retrieved' && <RetrievedCard files={m.files} />}
               </Fragment>
             );
           })}

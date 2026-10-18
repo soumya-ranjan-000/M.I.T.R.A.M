@@ -4,6 +4,7 @@ Standalone VS Code coding agent with its own webview UI. Chat + agent only (no g
 Work top to bottom. Don't start a step until the previous step's **Done when** is true.
 
 ## Stack
+
 - TypeScript, VS Code Extension API
 - Bundler: esbuild (extension host), Vite + React (webview)
 - Model: Claude API via `@anthropic-ai/sdk` behind a `ModelProvider` interface
@@ -11,6 +12,7 @@ Work top to bottom. Don't start a step until the previous step's **Done when** i
 - Package: `@vscode/vsce`
 
 ## Target folder structure
+
 ```
 M.I.T.R.A.M/
 ├── package.json              # extension manifest + contributes
@@ -74,14 +76,14 @@ M.I.T.R.A.M/
 
 - [x] **2.1** `Tool` interface: `{ name, description, inputSchema (JSON Schema), requiresApproval, run(input, ctx) -> result }`. Central `ToolRegistry`.
 - [x] **2.2** `workspaceGuard`: resolve every path against workspace root, reject `..` escapes and symlinks leaving the root. **All tools must go through it.**
-- [x] **2.3** Read-only tools: `read_file` (with line ranges, size cap), `list_dir`, `search_files` (shell out to bundled `ripgrep` via `@vscode/ripgrep`), `get_diagnostics` (`languages.getDiagnostics`).
+- [x] **2.3** Read-only tools: `read_file` (with line ranges, size cap), `list_dir`, `search_files` _(implemented as a Node directory walk, not ripgrep)_, `get_diagnostics` (`languages.getDiagnostics`).
 - [x] **2.4** `AgentLoop`:
   1. send messages + tool defs
   2. collect `tool_use` blocks
   3. run tools (parallel if independent)
   4. append `tool_result`s
   5. repeat until `stop` with no tool calls
-  Guards: max 25 iterations, abort signal, per-tool timeout, catch tool errors and return them as `is_error` results (don't crash the loop).
+     Guards: max 25 iterations, abort signal, per-tool timeout, catch tool errors and return them as `is_error` results (don't crash the loop).
 - [x] **2.5** UI `ToolCard`: name, input summary, status (running/ok/error), expandable output.
 - [x] **2.6** Write `SystemPrompt`: role, tool-use guidance (read before edit, small edits, verify with diagnostics), workspace info, OS, date.
 - [x] **2.7** `edit_file` tool: `{ path, old_string, new_string }`, exact match, must be unique, else return an error telling the model to add context. `create_file` for new files. Apply edits via `WorkspaceEdit` so undo works in the editor.
@@ -96,7 +98,7 @@ M.I.T.R.A.M/
 - [x] **3.3** `commandPolicy`: denylist (`rm -rf /`, `sudo`, `curl | sh`, force push, etc.), always require approval for anything not on the allowlist; setting to configure.
 - [x] **3.4** Checkpoints: before each agent turn that edits files, snapshot the touched files in memory/storage; add a "Revert this turn" button.
 - [x] **3.5** Treat tool output as untrusted: file contents and command output can contain prompt injection. Keep them in `tool_result` blocks only, and never auto-approve based on their content.
-- [x] **3.6** Settings: auto-approve reads (default on), auto-approve edits (default off), max iterations.
+- [x] **3.6** Settings: auto-approve reads (default on), auto-approve edits (default off), skip approval prompts for edits and commands (default off; blocked commands remain blocked), max iterations.
 
 **Done when:** no file write or command executes without the approval your settings require; revert restores files exactly.
 
@@ -108,6 +110,7 @@ M.I.T.R.A.M/
 - [x] **4.4** Project instructions: load `MITRAM.md` from the workspace root and append it to the system prompt.
 - [x] **4.5** `ContextBuilder`: include open editor tabs, git branch + short `git diff --stat`, and recent diagnostics.
 - [x] **4.6** Eval harness (`test/evals/`): 20-30 small tasks in fixture repos with pass/fail checks (tests pass, file contains X). Run before every release to catch regressions.
+- [x] **4.7** Pre-analysis retrieval: a local keyword index (BM25, identifiers, word forms, synonyms) attaches likely-relevant files and excerpts to each message, with a gate for chatter, a "related files" card, and `npm run bench:retrieval`. Results and limits: [`docs/code-retrieval.md`](docs/code-retrieval.md). _(on independently written requests it is no better than one well-chosen search yet; measuring the agent effect is next)_
 
 **Done when:** a 50-turn session on a mid-size repo doesn't overflow, and eval pass rate is recorded as a baseline.
 
@@ -136,14 +139,35 @@ M.I.T.R.A.M/
 
 **Done when:** the baseline shows the long tasks passing on your model.
 
+## Phase 7: MCP client
+
+Connect to user-configured MCP servers and expose their tools to the agent loop as ordinary
+`Tool` objects. Full design, file layout and risks: **[`docs/mcp-plan.md`](docs/mcp-plan.md)**.
+
+- [ ] **7.0** Add `@modelcontextprotocol/sdk` to `dependencies`; confirm esbuild bundles it for `node20` with no dynamic-require warnings before building on it.
+- [ ] **7.1** `mitram.mcpServers` setting (scope `application`) + `src/mcp/config.ts`: validate entries, `${env:NAME}` expansion, secrets via `SecretStore`.
+- [ ] **7.2** `McpClient`: connect (stdio + streamable HTTP) with timeouts, `listTools`, `callTool`, status, `close()`.
+- [ ] **7.3** `mcpTool.ts`: wrap an MCP tool as a `Tool` (`mcp__<server>__<tool>`, args in the preview, text flattening, truncation, server errors → `is_error`).
+- [ ] **7.4** `McpManager`: lifecycle, parallel lazy connect, restart on settings change, dispose kills every child process.
+- [ ] **7.5** `createRegistry(mcp)` (async) used by `ChatViewProvider.run()`; cap total MCP tools; plan mode still filters them out.
+- [ ] **7.6** Safety: per-workspace trust prompt, `isAutoApproved` branch for `mcp__…`, `mitram.blockedMcpTools`, untrusted-output line in the system prompt, argument-free logging.
+- [ ] **7.7** UI: MCP badge on tool cards, server status + Reconnect, `/mcp` slash command, protocol validators and tests.
+- [ ] **7.8** README + CHANGELOG + one eval task driving a trivial local stdio server.
+
+**Done when:** a configured server's tool runs end to end behind an approval gate, a failing server
+never breaks a run, no child process survives `deactivate()`, and with zero servers configured
+nothing about today's behaviour changes.
+
 ## Post-MVP backlog (don't touch before Phase 5 is done)
+
 - More providers (OpenAI-compatible, Ollama), via `ModelProvider`
-- MCP client support
+- MCP resources and prompts; M.I.T.R.A.M **as** an MCP server (see `docs/mcp-plan.md`, "Later")
 - Sub-agents / parallel tasks
 - Embedding-based code search
 - Ghost-text inline completion (previously cut from MVP)
 
 ## Weekly rhythm
+
 1. Pick the next unchecked step.
 2. Write the test or manual-verification script first when the step is a tool.
 3. Run the eval set at the end of every phase.

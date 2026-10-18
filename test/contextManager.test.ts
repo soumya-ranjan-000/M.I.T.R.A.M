@@ -79,6 +79,15 @@ describe('manageContext', () => {
     assertValid(h);
   });
 
+  it('removes retrieved code from old messages like attached context', () => {
+    const ctx = `<retrieved>\nsrc/a.ts:1-20 (a)\n<snippet path="src/a.ts" lines="1-20">\n${big(80_000)}\n</snippet>\n</retrieved>\n`;
+    const h = [...turn(1, 100, ctx), ...turn(2, 100, ctx), ...turn(3, 100, ctx), ...turn(4, 100, ctx)];
+    manageContext(h, opts);
+    expect(String(h[0].content)).toBe(`${REMOVED_CONTEXT}\nquestion 1`);
+    expect(String(h.at(-4)!.content)).toContain('<retrieved>');
+    assertValid(h);
+  });
+
   it('drops the oldest whole turns when clearing is not enough, never the current turn', () => {
     // Plain text conversation: nothing clearable, so whole turns must go.
     const h: ChatMessage[] = [];

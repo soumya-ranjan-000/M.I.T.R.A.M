@@ -44,6 +44,8 @@ export function applyHostEvent(messages: DisplayMessage[], event: HostToWebview)
       );
     case 'notice':
       return [...messages, { role: 'assistant', text: `_${event.text}_` }];
+    case 'retrieved':
+      return [...messages, { role: 'retrieved', files: event.files }];
     default:
       return messages;
   }

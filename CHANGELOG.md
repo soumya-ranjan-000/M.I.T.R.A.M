@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- **Related code up front:** each message now carries the files a local keyword search matched to it (paths, line ranges and short excerpts from the top two, about 650 tokens), so the agent can start from the right code instead of searching first. It understands identifiers (`autoApproveEdits`, `cache_control`), word forms and common developer synonyms ("revert" finds code that says "restore"). Messages that name no code, such as "looks good, go ahead", usually attach nothing. A collapsed **Attached N related files** card under your message shows what was sent; click a file to open it at those lines. The index respects `.gitignore`, lives in memory and updates as files change. It is a starting point, not always right: the agent is told to check the files before relying on them. Turn it off with `mitram.retrieveContext`.
+- **Skip approval prompts:** the user-level `mitram.skipApprovalPrompts` setting skips approval prompts for file edits, file creation and commands. Commands blocked by the safety policy remain blocked. Off by default, and ignored in a workspace's `.vscode/settings.json`.
+
 ## 0.2.0
 
 - Fixed: hiding the chat (switching side bar views, or closing and reopening it) during a run lost the "Writing…" status, timer, stop button and glow while the agent kept working. The reopened view now picks the run back up, along with the context bar and the **Revert changes** bar.

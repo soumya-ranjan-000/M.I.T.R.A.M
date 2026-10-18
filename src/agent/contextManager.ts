@@ -12,7 +12,7 @@ export const SUMMARY_PREFIX = '[Summary of the earlier conversation, written to 
 /** What we assume a summary costs when deciding how much to replace. */
 const SUMMARY_TOKENS = 800;
 const MIN_CLEARABLE_CHARS = 400;
-const CONTEXT_BLOCK_RE = /<(context|environment)>[\s\S]*?<\/\1>\s*/g;
+const CONTEXT_BLOCK_RE = /<(context|environment|retrieved)>[\s\S]*?<\/\1>\s*/g;
 
 type Block = { type: string; [key: string]: unknown };
 

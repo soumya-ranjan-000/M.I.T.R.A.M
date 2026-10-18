@@ -48,6 +48,8 @@ export function activate(context: vscode.ExtensionContext): void {
           contextWindow: s.contextWindow,
           promptCaching: s.promptCaching,
           includeEnvironment: s.includeEnvironment,
+          retrieveContext: s.retrieveContext,
+          skipApprovalPrompts: s.skipApprovalPrompts,
           autoApproveEdits: s.autoApproveEdits,
           autoApproveSafeCommands: s.autoApproveSafeCommands,
           autoApproveCommands: s.autoApproveCommands.length,

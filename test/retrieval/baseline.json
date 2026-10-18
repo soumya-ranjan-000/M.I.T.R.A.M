@@ -1,0 +1,5470 @@
+{
+  "date": "2026-10-18T19:35:13.156Z",
+  "ref": "0d3ab3ba994ded0615f806d9f1af453c51512591",
+  "machine": {
+    "node": "v22.22.1",
+    "platform": "linux",
+    "cpu": "Intel(R) Core(TM) 7 240H",
+    "cpus": 16
+  },
+  "ranking": {
+    "overall": {
+      "tuning": {
+        "search_files, all terms": {
+          "rr": 0.0320054945054945,
+          "recall5": 0.013888888888888888,
+          "recall10": 0.013888888888888888,
+          "found": 0.20833333333333334,
+          "tokens": 3082.380952380952,
+          "capped": 1
+        },
+        "search_files, avg single term": {
+          "rr": 0.13742389704279148,
+          "recall5": 0.14623015873015874,
+          "recall10": 0.2781994047619048,
+          "found": 0.6242063492063493,
+          "tokens": 1564.033904950869,
+          "capped": 0.3694113756613758
+        },
+        "search_files, best single term": {
+          "rr": 0.4162563131313132,
+          "recall5": 0.5833333333333334,
+          "recall10": 0.7013888888888888,
+          "found": 1,
+          "tokens": 710.9404761904761,
+          "capped": 0
+        },
+        "find_files, all terms": {
+          "rr": 0.17013888888888892,
+          "recall5": 0.13888888888888887,
+          "recall10": 0.13888888888888887,
+          "found": 0.2916666666666667,
+          "tokens": 18.261904761904763,
+          "capped": 0
+        },
+        "find_files, avg single term": {
+          "rr": 0.04548611111111111,
+          "recall5": 0.023668981481481485,
+          "recall10": 0.023668981481481485,
+          "found": 0.049652777777777775,
+          "tokens": 6.514517195767197,
+          "capped": 0
+        },
+        "find_files, best single term": {
+          "rr": 0.2708333333333333,
+          "recall5": 0.13888888888888887,
+          "recall10": 0.13888888888888887,
+          "found": 0.2916666666666667,
+          "tokens": 7.023809523809523,
+          "capped": 0
+        },
+        "pre-pass, attached block": {
+          "rr": 0.7708333333333334,
+          "recall5": 0.8680555555555555,
+          "recall10": 0.8680555555555555,
+          "found": 0.9583333333333334,
+          "tokens": 664.9166666666666,
+          "capped": 0
+        },
+        "pre-pass, ranking only (no gate)": {
+          "rr": 0.7767857142857144,
+          "recall5": 0.8680555555555555,
+          "recall10": 0.9652777777777777,
+          "found": 1,
+          "tokens": null,
+          "capped": 0
+        }
+      },
+      "held out 1": {
+        "search_files, all terms": {
+          "rr": 0.03919817927170868,
+          "recall5": 0,
+          "recall10": 0.0625,
+          "found": 0.5,
+          "tokens": 3030.2857142857147,
+          "capped": 0.875
+        },
+        "search_files, avg single term": {
+          "rr": 0.12075018648679364,
+          "recall5": 0.11785714285714285,
+          "recall10": 0.3145833333333333,
+          "found": 0.6116071428571429,
+          "tokens": 1235.281632653061,
+          "capped": 0.20535714285714285
+        },
+        "search_files, best single term": {
+          "rr": 0.4045138888888889,
+          "recall5": 0.5,
+          "recall10": 0.875,
+          "found": 1,
+          "tokens": 873.9642857142858,
+          "capped": 0.125
+        },
+        "find_files, all terms": {
+          "rr": 0.125,
+          "recall5": 0.0625,
+          "recall10": 0.0625,
+          "found": 0.125,
+          "tokens": 18.178571428571427,
+          "capped": 0
+        },
+        "find_files, avg single term": {
+          "rr": 0.025,
+          "recall5": 0.0125,
+          "recall10": 0.0125,
+          "found": 0.025,
+          "tokens": 5.978911564625849,
+          "capped": 0
+        },
+        "find_files, best single term": {
+          "rr": 0.125,
+          "recall5": 0.0625,
+          "recall10": 0.0625,
+          "found": 0.125,
+          "tokens": 4.571428571428571,
+          "capped": 0
+        },
+        "pre-pass, attached block": {
+          "rr": 0.90625,
+          "recall5": 0.9375,
+          "recall10": 1,
+          "found": 1,
+          "tokens": 621.3571428571429,
+          "capped": 0
+        },
+        "pre-pass, ranking only (no gate)": {
+          "rr": 0.90625,
+          "recall5": 0.9375,
+          "recall10": 1,
+          "found": 1,
+          "tokens": null,
+          "capped": 0
+        }
+      },
+      "held out 2": {
+        "search_files, all terms": {
+          "rr": 0.028378505552418595,
+          "recall5": 0,
+          "recall10": 0,
+          "found": 0.5,
+          "tokens": 3193.2142857142853,
+          "capped": 1
+        },
+        "search_files, avg single term": {
+          "rr": 0.09264775733525735,
+          "recall5": 0.11458333333333331,
+          "recall10": 0.2482142857142857,
+          "found": 0.450297619047619,
+          "tokens": 1500.8287840136054,
+          "capped": 0.3619047619047619
+        },
+        "search_files, best single term": {
+          "rr": 0.30476641414141414,
+          "recall5": 0.375,
+          "recall10": 0.75,
+          "found": 1,
+          "tokens": 1128.9285714285713,
+          "capped": 0.25
+        },
+        "find_files, all terms": {
+          "rr": 0.03125,
+          "recall5": 0.0625,
+          "recall10": 0.0625,
+          "found": 0.125,
+          "tokens": 16.035714285714285,
+          "capped": 0
+        },
+        "find_files, avg single term": {
+          "rr": 0.010416666666666666,
+          "recall5": 0.010416666666666666,
+          "recall10": 0.010416666666666666,
+          "found": 0.020833333333333332,
+          "tokens": 5.770408163265306,
+          "capped": 0
+        },
+        "find_files, best single term": {
+          "rr": 0.0625,
+          "recall5": 0.0625,
+          "recall10": 0.0625,
+          "found": 0.125,
+          "tokens": 6.178571428571428,
+          "capped": 0
+        },
+        "pre-pass, attached block": {
+          "rr": 0.65,
+          "recall5": 0.9375,
+          "recall10": 0.9375,
+          "found": 1,
+          "tokens": 600.8214285714286,
+          "capped": 0
+        },
+        "pre-pass, ranking only (no gate)": {
+          "rr": 0.65,
+          "recall5": 0.9375,
+          "recall10": 0.9375,
+          "found": 1,
+          "tokens": null,
+          "capped": 0
+        }
+      },
+      "held out 3": {
+        "search_files, all terms": {
+          "rr": 0.010114942528735632,
+          "recall5": 0,
+          "recall10": 0,
+          "found": 0.2,
+          "tokens": 2872.4857142857136,
+          "capped": 1
+        },
+        "search_files, avg single term": {
+          "rr": 0.07076126555478336,
+          "recall5": 0.08114361945244299,
+          "recall10": 0.16922608437314318,
+          "found": 0.3668538324420677,
+          "tokens": 1051.0923050152462,
+          "capped": 0.17855506421682893
+        },
+        "search_files, best single term": {
+          "rr": 0.4026923076923077,
+          "recall5": 0.6833333333333333,
+          "recall10": 0.75,
+          "found": 1,
+          "tokens": 895.4571428571429,
+          "capped": 0.2
+        },
+        "find_files, all terms": {
+          "rr": 0.05,
+          "recall5": 0.05,
+          "recall10": 0.05,
+          "found": 0.1,
+          "tokens": 22.4,
+          "capped": 0
+        },
+        "find_files, avg single term": {
+          "rr": 0.003125,
+          "recall5": 0.003125,
+          "recall10": 0.003125,
+          "found": 0.00625,
+          "tokens": 5.251155592773242,
+          "capped": 0
+        },
+        "find_files, best single term": {
+          "rr": 0.05,
+          "recall5": 0.05,
+          "recall10": 0.05,
+          "found": 0.1,
+          "tokens": 6.542857142857143,
+          "capped": 0
+        },
+        "pre-pass, attached block": {
+          "rr": 0.45,
+          "recall5": 0.45,
+          "recall10": 0.45,
+          "found": 0.5,
+          "tokens": 696,
+          "capped": 0
+        },
+        "pre-pass, ranking only (no gate)": {
+          "rr": 0.4725,
+          "recall5": 0.45,
+          "recall10": 0.6166666666666667,
+          "found": 0.7,
+          "tokens": null,
+          "capped": 0
+        }
+      },
+      "all held out": {
+        "search_files, all terms": {
+          "rr": 0.024683188610783634,
+          "recall5": 0,
+          "recall10": 0.019230769230769232,
+          "found": 0.38461538461538464,
+          "tokens": 3019.7252747252755,
+          "capped": 0.9615384615384616
+        },
+        "search_files, avg single term": {
+          "rr": 0.09287677715862466,
+          "recall5": 0.10272923092493226,
+          "recall10": 0.23825545369663018,
+          "found": 0.4678375546022605,
+          "tokens": 1246.1463993648383,
+          "capped": 0.24321714924090487
+        },
+        "search_files, best single term": {
+          "rr": 0.3731217500448269,
+          "recall5": 0.532051282051282,
+          "recall10": 0.7884615384615384,
+          "found": 1,
+          "tokens": 960.6813186813189,
+          "capped": 0.19230769230769232
+        },
+        "find_files, all terms": {
+          "rr": 0.0673076923076923,
+          "recall5": 0.057692307692307696,
+          "recall10": 0.057692307692307696,
+          "found": 0.11538461538461539,
+          "tokens": 19.142857142857142,
+          "capped": 0
+        },
+        "find_files, avg single term": {
+          "rr": 0.012099358974358975,
+          "recall5": 0.008253205128205128,
+          "recall10": 0.008253205128205128,
+          "found": 0.016506410256410257,
+          "tokens": 5.634850528879294,
+          "capped": 0
+        },
+        "find_files, best single term": {
+          "rr": 0.07692307692307693,
+          "recall5": 0.057692307692307696,
+          "recall10": 0.057692307692307696,
+          "found": 0.11538461538461539,
+          "tokens": 5.824175824175824,
+          "capped": 0
+        },
+        "pre-pass, attached block": {
+          "rr": 0.6519230769230769,
+          "recall5": 0.75,
+          "recall10": 0.7692307692307693,
+          "found": 0.8076923076923077,
+          "tokens": 643.7472527472528,
+          "capped": 0
+        },
+        "pre-pass, ranking only (no gate)": {
+          "rr": 0.6605769230769231,
+          "recall5": 0.75,
+          "recall10": 0.8333333333333334,
+          "found": 0.8846153846153846,
+          "tokens": null,
+          "capped": 0
+        }
+      }
+    },
+    "byKind": {
+      "identifier": {
+        "search_files, all terms": {
+          "rr": 0.045093795093795096,
+          "recall5": 0.02222222222222222,
+          "recall10": 0.02222222222222222,
+          "found": 0.26666666666666666,
+          "tokens": 3063.8666666666677,
+          "capped": 1
+        },
+        "search_files, avg single term": {
+          "rr": 0.16446410069214887,
+          "recall5": 0.20616910866910862,
+          "recall10": 0.3214194139194139,
+          "found": 0.6271550671550672,
+          "tokens": 1437.4858270829702,
+          "capped": 0.3007376882376882
+        },
+        "search_files, best single term": {
+          "rr": 0.48555555555555546,
+          "recall5": 0.8111111111111111,
+          "recall10": 0.8777777777777778,
+          "found": 1,
+          "tokens": 539.9619047619047,
+          "capped": 0
+        },
+        "find_files, all terms": {
+          "rr": 0.2222222222222222,
+          "recall5": 0.15555555555555553,
+          "recall10": 0.15555555555555553,
+          "found": 0.3333333333333333,
+          "tokens": 17.752380952380953,
+          "capped": 0
+        },
+        "find_files, avg single term": {
+          "rr": 0.044305555555555556,
+          "recall5": 0.024675925925925928,
+          "recall10": 0.024675925925925928,
+          "found": 0.05305555555555556,
+          "tokens": 6.115098261526834,
+          "capped": 0
+        },
+        "find_files, best single term": {
+          "rr": 0.26666666666666666,
+          "recall5": 0.15555555555555553,
+          "recall10": 0.15555555555555553,
+          "found": 0.3333333333333333,
+          "tokens": 8.304761904761907,
+          "capped": 0
+        },
+        "pre-pass, attached block": {
+          "rr": 0.8888888888888888,
+          "recall5": 0.9111111111111111,
+          "recall10": 0.9111111111111111,
+          "found": 1,
+          "tokens": 634.0000000000001,
+          "capped": 0
+        },
+        "pre-pass, ranking only (no gate)": {
+          "rr": 0.8888888888888888,
+          "recall5": 0.9111111111111111,
+          "recall10": 0.9666666666666667,
+          "found": 1,
+          "tokens": null,
+          "capped": 0
+        }
+      },
+      "natural": {
+        "search_files, all terms": {
+          "rr": 0.020956795588723317,
+          "recall5": 0,
+          "recall10": 0.014285714285714285,
+          "found": 0.3142857142857143,
+          "tokens": 3043.7714285714287,
+          "capped": 0.9714285714285714
+        },
+        "search_files, avg single term": {
+          "rr": 0.09274309213625723,
+          "recall5": 0.08822706238672624,
+          "recall10": 0.23000389433162546,
+          "found": 0.5067829369510041,
+          "tokens": 1382.1237913160605,
+          "capped": 0.30509867350203485
+        },
+        "search_files, best single term": {
+          "rr": 0.3545138195138195,
+          "recall5": 0.44761904761904764,
+          "recall10": 0.6904761904761904,
+          "found": 1,
+          "tokens": 969.7387755102039,
+          "capped": 0.14285714285714285
+        },
+        "find_files, all terms": {
+          "rr": 0.07142857142857142,
+          "recall5": 0.07142857142857142,
+          "recall10": 0.07142857142857142,
+          "found": 0.14285714285714285,
+          "tokens": 19.13469387755102,
+          "capped": 0
+        },
+        "find_files, avg single term": {
+          "rr": 0.02119047619047619,
+          "recall5": 0.011785714285714285,
+          "recall10": 0.011785714285714285,
+          "found": 0.02357142857142857,
+          "tokens": 6.032230072182055,
+          "capped": 0
+        },
+        "find_files, best single term": {
+          "rr": 0.12857142857142856,
+          "recall5": 0.07142857142857142,
+          "recall10": 0.07142857142857142,
+          "found": 0.14285714285714285,
+          "tokens": 5.5836734693877546,
+          "capped": 0
+        },
+        "pre-pass, attached block": {
+          "rr": 0.631904761904762,
+          "recall5": 0.7619047619047619,
+          "recall10": 0.7761904761904761,
+          "found": 0.8285714285714286,
+          "tokens": 662.4408163265308,
+          "capped": 0
+        },
+        "pre-pass, ranking only (no gate)": {
+          "rr": 0.6424149659863946,
+          "recall5": 0.7619047619047619,
+          "recall10": 0.8666666666666666,
+          "found": 0.9142857142857143,
+          "tokens": null,
+          "capped": 0
+        }
+      }
+    },
+    "gate": {
+      "tuning requests": {
+        "total": 24,
+        "attached": 24
+      },
+      "held-out requests, round 1": {
+        "total": 8,
+        "attached": 8
+      },
+      "held-out requests, round 2": {
+        "total": 8,
+        "attached": 8
+      },
+      "held-out requests, round 3": {
+        "total": 10,
+        "attached": 10
+      },
+      "chatter (tuning)": {
+        "total": 8,
+        "attached": 1
+      },
+      "chatter (held out, round 1)": {
+        "total": 8,
+        "attached": 1
+      },
+      "chatter (held out, round 2)": {
+        "total": 8,
+        "attached": 3
+      },
+      "chatter (held out, round 3)": {
+        "total": 6,
+        "attached": 2
+      }
+    },
+    "perRequest": [
+      {
+        "id": "stop-running-command",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "pressing",
+          "stop",
+          "cancel",
+          "command",
+          "running"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.07692307692307693,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3687.4285714285716,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.19,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.4,
+            "found": 0.6,
+            "tokens": 1553.4857142857143,
+            "capped": 0.4
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 371.14285714285717,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 26.857142857142858,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 8.8,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 0.6666666666666666,
+            "recall10": 0.6666666666666666,
+            "found": 1,
+            "tokens": 734.2857142857143,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 0.6666666666666666,
+            "recall10": 0.6666666666666666,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 13,
+        "bestSearchTerm": "cancel@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          1,
+          4
+        ],
+        "attachedChars": 2570,
+        "allTermsMatchesByDir": {
+          "(root files)": 74,
+          ".vscode/": 1,
+          "media/": 3,
+          "scripts/": 1,
+          "src/": 21
+        },
+        "allTermsMatchesInGold": 10
+      },
+      {
+        "id": "search-results-setting",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "setting",
+          "maximum",
+          "number",
+          "matches",
+          "search_files",
+          "returns"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.5,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.3333333333333333,
+            "found": 1,
+            "tokens": 2392.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.5115740740740741,
+            "recall5": 0.27777777777777773,
+            "recall10": 0.38888888888888884,
+            "found": 1,
+            "tokens": 1020.6190476190476,
+            "capped": 0.3333333333333333
+          },
+          "search_files, best single term": {
+            "rr": 1,
+            "recall5": 0.6666666666666666,
+            "recall10": 0.6666666666666666,
+            "found": 1,
+            "tokens": 144,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 1,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.3333333333333333,
+            "found": 1,
+            "tokens": 6.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.16666666666666666,
+            "recall5": 0.05555555555555555,
+            "recall10": 0.05555555555555555,
+            "found": 0.16666666666666666,
+            "tokens": 4.666666666666666,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 1,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.3333333333333333,
+            "found": 1,
+            "tokens": 6.571428571428571,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 0.6666666666666666,
+            "recall10": 0.6666666666666666,
+            "found": 1,
+            "tokens": 759.4285714285714,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 0.6666666666666666,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 2,
+        "bestSearchTerm": "maximum@1",
+        "bestFindTerm": "setting@1",
+        "attachedRanks": [
+          1,
+          2,
+          null
+        ],
+        "attachedChars": 2658,
+        "allTermsMatchesByDir": {
+          "(root files)": 23,
+          "sandbox/": 25,
+          "src/": 52
+        },
+        "allTermsMatchesInGold": 6
+      },
+      {
+        "id": "diff-preview-content",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "diff",
+          "shown",
+          "approve",
+          "edit",
+          "text",
+          "sides"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3345.714285714286,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.02556818181818182,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0.3333333333333333,
+            "tokens": 1887.2857142857144,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.09090909090909091,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 1430,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0.25,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 43.714285714285715,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.16666666666666666,
+            "recall5": 0.08333333333333333,
+            "recall10": 0.08333333333333333,
+            "found": 0.16666666666666666,
+            "tokens": 10.095238095238097,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 6,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 630.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "diff@11",
+        "bestFindTerm": "edit@1",
+        "attachedRanks": [
+          3,
+          1
+        ],
+        "attachedChars": 2208,
+        "allTermsMatchesByDir": {
+          "(root files)": 75,
+          "docs/": 1,
+          "sandbox/": 21,
+          "src/": 3
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "block-force-push",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "block",
+          "git",
+          "push",
+          "force",
+          "safe",
+          "commands",
+          "auto",
+          "approved"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2930.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.13624864718614718,
+            "recall5": 0.125,
+            "recall10": 0.1875,
+            "found": 1,
+            "tokens": 2360.392857142857,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 1559.7142857142858,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 14.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.9642857142857135,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2.857142857142857,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 712.2857142857143,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "approved@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          4
+        ],
+        "attachedChars": 2493,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "revert-created-files",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "revert",
+          "turn",
+          "leaves",
+          "behind",
+          "files",
+          "agent",
+          "created"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3628.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.06701141995259642,
+            "recall5": 0.14285714285714285,
+            "recall10": 0.14285714285714285,
+            "found": 0.42857142857142855,
+            "tokens": 1665.0612244897961,
+            "capped": 0.42857142857142855
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 837.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 22.285714285714285,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 6.20408163265306,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 531.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "created@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2
+        ],
+        "attachedChars": 1859,
+        "allTermsMatchesByDir": {
+          "(root files)": 84,
+          ".vscode/": 1,
+          "docs/": 1,
+          "sandbox/": 14
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "summarise-not-drop",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "context",
+          "fills",
+          "turns",
+          "dropped",
+          "summarised"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.07692307692307693,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3068.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.14857142857142858,
+            "recall5": 0.1,
+            "recall10": 0.3,
+            "found": 0.6,
+            "tokens": 1251.0285714285715,
+            "capped": 0.2
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 539.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 21.714285714285715,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.2,
+            "recall5": 0.1,
+            "recall10": 0.1,
+            "found": 0.2,
+            "tokens": 7.7714285714285705,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 21.714285714285715,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 746.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 13,
+        "bestSearchTerm": "dropped@2",
+        "bestFindTerm": "context@1",
+        "attachedRanks": [
+          1,
+          3
+        ],
+        "attachedChars": 2614,
+        "allTermsMatchesByDir": {
+          "(root files)": 21,
+          "sandbox/": 4,
+          "src/": 75
+        },
+        "allTermsMatchesInGold": 45
+      },
+      {
+        "id": "environment-commit",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "include",
+          "latest",
+          "commit",
+          "message",
+          "git",
+          "branch",
+          "environment",
+          "block"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2984.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.11656746031746032,
+            "recall5": 0.0625,
+            "recall10": 0.4375,
+            "found": 0.625,
+            "tokens": 1623.821428571429,
+            "capped": 0.375
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 91.42857142857143,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 10,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.125,
+            "recall5": 0.0625,
+            "recall10": 0.0625,
+            "found": 0.125,
+            "tokens": 4.428571428571429,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 6.857142857142857,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 698.5714285714286,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "commit@2",
+        "bestFindTerm": "environment@1",
+        "attachedRanks": [
+          2,
+          1
+        ],
+        "attachedChars": 2445,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "symlink-escape",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "read_file",
+          "follow",
+          "symlink",
+          "file",
+          "outside",
+          "workspace"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3600.285714285714,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.17857142857142858,
+            "recall5": 0.25,
+            "recall10": 0.3333333333333333,
+            "found": 0.6666666666666666,
+            "tokens": 1554.5238095238094,
+            "capped": 0.3333333333333333
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 735.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 26.857142857142858,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.16666666666666666,
+            "recall5": 0.08333333333333333,
+            "recall10": 0.08333333333333333,
+            "found": 0.16666666666666666,
+            "tokens": 7.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 16,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 655.4285714285714,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "outside@3",
+        "bestFindTerm": "workspace@1",
+        "attachedRanks": [
+          2,
+          1
+        ],
+        "attachedChars": 2294,
+        "allTermsMatchesByDir": {
+          "(root files)": 60,
+          ".vscode/": 3,
+          "docs/": 4,
+          "sandbox/": 4,
+          "scripts/": 2,
+          "src/": 27
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "help-slash-command",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "help",
+          "slash",
+          "command",
+          "lists",
+          "commands"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3530.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.052500000000000005,
+            "recall5": 0.1,
+            "recall10": 0.2,
+            "found": 0.4,
+            "tokens": 1762.4,
+            "capped": 0.2
+          },
+          "search_files, best single term": {
+            "rr": 0.2,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 1381.7142857142858,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 42.857142857142854,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.1,
+            "recall5": 0.1,
+            "recall10": 0.1,
+            "found": 0.2,
+            "tokens": 14.742857142857142,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 27.142857142857142,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 607.4285714285714,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "slash@5",
+        "bestFindTerm": "slash@2",
+        "attachedRanks": [
+          1,
+          5
+        ],
+        "attachedChars": 2126,
+        "allTermsMatchesByDir": {
+          "(root files)": 70,
+          ".vscode/": 1,
+          "scripts/": 1,
+          "src/": 28
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "cache-control-miss",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "prompt",
+          "caching",
+          "hits",
+          "message",
+          "cache_control",
+          "set"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3330.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.11070411070411072,
+            "recall5": 0.16666666666666666,
+            "recall10": 0.3333333333333333,
+            "found": 0.8333333333333334,
+            "tokens": 1721.3333333333333,
+            "capped": 0.3333333333333333
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 606.8571428571429,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 6.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.666666666666667,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 977.7142857142857,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "cache_control@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2
+        ],
+        "attachedChars": 3422,
+        "allTermsMatchesByDir": {
+          "(root files)": 56,
+          "docs/": 4,
+          "media/": 3,
+          "sandbox/": 8,
+          "scripts/": 1,
+          "src/": 28
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "board-panel-refresh",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "plan",
+          "board",
+          "panel",
+          "refresh",
+          "agent",
+          "working"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3260.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.09893162393162393,
+            "recall5": 0.1111111111111111,
+            "recall10": 0.2222222222222222,
+            "found": 0.8333333333333334,
+            "tokens": 1903.4761904761906,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.2,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.6666666666666666,
+            "found": 1,
+            "tokens": 1003.1428571428571,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 40.285714285714285,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10.476190476190476,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 731.7142857142857,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "panel@5",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          2,
+          5
+        ],
+        "attachedChars": 2561,
+        "allTermsMatchesByDir": {
+          "(root files)": 69,
+          ".vscode/": 1,
+          "docs/": 1,
+          "sandbox/": 15,
+          "src/": 14
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "stuck-sooner",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "agent",
+          "repeated",
+          "failing",
+          "tool",
+          "call",
+          "times",
+          "stopping",
+          "stop",
+          "sooner"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3613.1428571428573,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.12037037037037036,
+            "recall5": 0.16666666666666666,
+            "recall10": 0.3333333333333333,
+            "found": 0.5555555555555556,
+            "tokens": 1452.6666666666665,
+            "capped": 0.3333333333333333
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 241.42857142857142,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.142857142857143,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.3809523809523805,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 620.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "times@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2,
+          1
+        ],
+        "attachedChars": 2173,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "api-key-in-logs",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "api",
+          "key",
+          "appear",
+          "logs"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2633.714285714286,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.07897727272727273,
+            "recall5": 0,
+            "recall10": 0.25,
+            "found": 0.75,
+            "tokens": 1450.642857142857,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.125,
+            "recall5": 0,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 592,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 600.5714285714286,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "logs@8",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          3
+        ],
+        "attachedChars": 2102,
+        "allTermsMatchesByDir": {
+          "(root files)": 78,
+          "docs/": 1,
+          "sandbox/": 20,
+          "src/": 1
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "instructions-github-folder",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "load",
+          "mitram",
+          "github",
+          "folder"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2356.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.11458333333333333,
+            "recall5": 0.25,
+            "recall10": 0.5,
+            "found": 0.5,
+            "tokens": 1655.8571428571427,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 953.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 495.42857142857144,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "load@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          3
+        ],
+        "attachedChars": 1734,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "tool-card-output",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "tool",
+          "cards",
+          "cut",
+          "off",
+          "command",
+          "output",
+          "early"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3840.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.2239795918367347,
+            "recall5": 0.14285714285714285,
+            "recall10": 0.35714285714285715,
+            "found": 0.7142857142857143,
+            "tokens": 1855.673469387755,
+            "capped": 0.2857142857142857
+          },
+          "search_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 67.42857142857143,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 32.285714285714285,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 7.63265306122449,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 633.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "early@1",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          3
+        ],
+        "attachedChars": 2216,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "diagnostics-node-modules",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "get_diagnostics",
+          "reports",
+          "problems",
+          "files",
+          "node_modules"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 1881.4285714285713,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.3517647058823529,
+            "recall5": 0.3,
+            "recall10": 0.3,
+            "found": 0.8,
+            "tokens": 1284.2857142857142,
+            "capped": 0.4
+          },
+          "search_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 282.2857142857143,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.542857142857143,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 542.2857142857143,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "reports@1",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          1
+        ],
+        "attachedChars": 1898,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "tool-result-limit",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "large",
+          "tool",
+          "results",
+          "cut",
+          "characters",
+          "limit",
+          "depend",
+          "context",
+          "window"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 1340,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.15846560846560848,
+            "recall5": 0.1111111111111111,
+            "recall10": 0.3888888888888889,
+            "found": 0.7777777777777778,
+            "tokens": 1495.3650793650793,
+            "capped": 0.4444444444444444
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 144.57142857142858,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 27.142857142857142,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 6.317460317460317,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 736.5714285714286,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "characters@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2,
+          3
+        ],
+        "attachedChars": 2578,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "verify-reminder",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "verify",
+          "done",
+          "reminder",
+          "fires",
+          "though",
+          "ran",
+          "tests"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.06666666666666667,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3705.714285714286,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.058333333333333334,
+            "recall5": 0.14285714285714285,
+            "recall10": 0.2857142857142857,
+            "found": 0.42857142857142855,
+            "tokens": 1370.3265306122448,
+            "capped": 0.2857142857142857
+          },
+          "search_files, best single term": {
+            "rr": 0.2,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 1253.142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 902.2857142857143,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.14285714285714285,
+            "recall5": 0,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 15,
+        "bestSearchTerm": "verify@5",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null
+        ],
+        "attachedChars": 3158,
+        "allTermsMatchesByDir": {
+          "(root files)": 52,
+          "docs/": 4,
+          "sandbox/": 2,
+          "src/": 42
+        },
+        "allTermsMatchesInGold": 4
+      },
+      {
+        "id": "model-picker-memory",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "model",
+          "picker",
+          "forgets",
+          "choice",
+          "reloading",
+          "window"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3325.4285714285716,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.023484848484848487,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0.3333333333333333,
+            "tokens": 934.9523809523811,
+            "capped": 0.16666666666666666
+          },
+          "search_files, best single term": {
+            "rr": 0.09090909090909091,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 1964,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 510,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "window@11",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          3,
+          null
+        ],
+        "attachedChars": 1785,
+        "allTermsMatchesByDir": {
+          "(root files)": 40,
+          ".vscode/": 2,
+          "docs/": 1,
+          "sandbox/": 7,
+          "scripts/": 2,
+          "src/": 48
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "mention-picker-dist",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "file",
+          "mentions",
+          "find",
+          "files",
+          "inside",
+          "nested",
+          "dist",
+          "folder"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3403.714285714286,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.0818939393939394,
+            "recall5": 0.0625,
+            "recall10": 0.1875,
+            "found": 0.625,
+            "tokens": 1411.8214285714284,
+            "capped": 0.375
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 823.1428571428571,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.857142857142857,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 832.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "mentions@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          3,
+          null
+        ],
+        "attachedChars": 2915,
+        "allTermsMatchesByDir": {
+          "(root files)": 68,
+          ".vscode/": 3,
+          "docs/": 4,
+          "sandbox/": 4,
+          "scripts/": 3,
+          "src/": 18
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "python-highlighting",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "code",
+          "blocks",
+          "replies",
+          "aren",
+          "syntax",
+          "highlighted",
+          "python"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2805.4285714285716,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.09523809523809523,
+            "recall5": 0.07142857142857142,
+            "recall10": 0.14285714285714285,
+            "found": 0.2857142857142857,
+            "tokens": 801.6326530612245,
+            "capped": 0.14285714285714285
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 74,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 29.428571428571427,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 7.877551020408163,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 604.5714285714286,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "highlighted@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          3
+        ],
+        "attachedChars": 2116,
+        "allTermsMatchesByDir": {
+          "(root files)": 86,
+          "docs/": 3,
+          "sandbox/": 11
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "usage-bar-cached",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "token",
+          "usage",
+          "bar",
+          "counts",
+          "cached",
+          "tokens",
+          "input"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2758,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.14920634920634918,
+            "recall5": 0.14285714285714285,
+            "recall10": 0.2857142857142857,
+            "found": 0.8571428571428571,
+            "tokens": 1737.142857142857,
+            "capped": 0.42857142857142855
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 381.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 587.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "cached@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          2
+        ],
+        "attachedChars": 2055,
+        "allTermsMatchesByDir": {
+          "(root files)": 35,
+          "docs/": 3,
+          "sandbox/": 10,
+          "src/": 52
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "sessions-per-workspace",
+        "kind": "natural",
+        "set": "tuning",
+        "terms": [
+          "store",
+          "chat",
+          "sessions",
+          "per",
+          "workspace",
+          "globally"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2874,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.15562770562770564,
+            "recall5": 0.25,
+            "recall10": 0.5,
+            "found": 0.8333333333333334,
+            "tokens": 1970.9047619047617,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 1233.142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 29.142857142857142,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.16666666666666666,
+            "recall5": 0.08333333333333333,
+            "recall10": 0.08333333333333333,
+            "found": 0.16666666666666666,
+            "tokens": 7.666666666666667,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 12.857142857142858,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 496.57142857142856,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "sessions@3",
+        "bestFindTerm": "sessions@1",
+        "attachedRanks": [
+          3,
+          2
+        ],
+        "attachedChars": 1738,
+        "allTermsMatchesByDir": {
+          "(root files)": 77,
+          ".vscode/": 3,
+          "docs/": 3,
+          "sandbox/": 17
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "auto-approve-edits",
+        "kind": "identifier",
+        "set": "tuning",
+        "terms": [
+          "autoapproveedits",
+          "apply",
+          "files",
+          "outside",
+          "src"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.047619047619047616,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3678,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.05,
+            "recall5": 0.2,
+            "recall10": 0.2,
+            "found": 0.2,
+            "tokens": 1812.1142857142854,
+            "capped": 0.4
+          },
+          "search_files, best single term": {
+            "rr": 0.25,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 350.85714285714283,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.542857142857143,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 610,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 21,
+        "bestSearchTerm": "autoapproveedits@4",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2,
+          3
+        ],
+        "attachedChars": 2135,
+        "allTermsMatchesByDir": {
+          "(root files)": 50,
+          ".vscode/": 1,
+          "sandbox/": 2,
+          "scripts/": 1,
+          "src/": 46
+        },
+        "allTermsMatchesInGold": 4
+      },
+      {
+        "id": "reasoning-stays-open",
+        "kind": "natural",
+        "set": "held out 1",
+        "terms": [
+          "keep",
+          "reasoning",
+          "section",
+          "expanded",
+          "model",
+          "finishes",
+          "thinking"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3672.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.06675170068027211,
+            "recall5": 0.14285714285714285,
+            "recall10": 0.14285714285714285,
+            "found": 0.42857142857142855,
+            "tokens": 1325.5510204081634,
+            "capped": 0.14285714285714285
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 136.85714285714286,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 616,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "expanded@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1
+        ],
+        "attachedChars": 2156,
+        "allTermsMatchesByDir": {
+          "(root files)": 47,
+          "docs/": 1,
+          "sandbox/": 7,
+          "src/": 45
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "crlf-edits",
+        "kind": "identifier",
+        "set": "held out 1",
+        "terms": [
+          "edit_file",
+          "find",
+          "text",
+          "files",
+          "windows",
+          "line",
+          "endings"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3544,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.11096938775510204,
+            "recall5": 0.14285714285714285,
+            "recall10": 0.2857142857142857,
+            "found": 0.5714285714285714,
+            "tokens": 1826.6938775510205,
+            "capped": 0.5714285714285714
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 79.42857142857143,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 54,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10.081632653061224,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 704.2857142857143,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "endings@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1
+        ],
+        "attachedChars": 2465,
+        "allTermsMatchesByDir": {
+          "(root files)": 72,
+          ".vscode/": 1,
+          "docs/": 12,
+          "media/": 4,
+          "sandbox/": 11
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "rate-limit-backoff",
+        "kind": "natural",
+        "set": "held out 1",
+        "terms": [
+          "retry",
+          "automatically",
+          "backoff",
+          "api",
+          "says",
+          "rate",
+          "limited"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.058823529411764705,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 2835.714285714286,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.16428571428571428,
+            "recall5": 0.21428571428571427,
+            "recall10": 0.35714285714285715,
+            "found": 0.7142857142857143,
+            "tokens": 716.9795918367346,
+            "capped": 0.14285714285714285
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 109.14285714285714,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 611.4285714285714,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 17,
+        "bestSearchTerm": "limited@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2,
+          1
+        ],
+        "attachedChars": 2140,
+        "allTermsMatchesByDir": {
+          "(root files)": 76,
+          "sandbox/": 5,
+          "src/": 19
+        },
+        "allTermsMatchesInGold": 1
+      },
+      {
+        "id": "delete-chat-disk",
+        "kind": "natural",
+        "set": "held out 1",
+        "terms": [
+          "deleting",
+          "chat",
+          "history",
+          "list",
+          "leaves",
+          "disk"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2984.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.04649054649054649,
+            "recall5": 0,
+            "recall10": 0.16666666666666666,
+            "found": 0.5,
+            "tokens": 1448.285714285714,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.1111111111111111,
+            "recall5": 0,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 2781.1428571428573,
+            "capped": 1
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 15.142857142857142,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.333333333333333,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 502.57142857142856,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "history@9",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2,
+          1
+        ],
+        "attachedChars": 1759,
+        "allTermsMatchesByDir": {
+          "(root files)": 44,
+          "sandbox/": 7,
+          "src/": 49
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "diagnostics-report",
+        "kind": "natural",
+        "set": "held out 1",
+        "terms": [
+          "context",
+          "window",
+          "size",
+          "copy",
+          "diagnostics",
+          "bug",
+          "report"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.07142857142857142,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 2953.1428571428573,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.12925170068027209,
+            "recall5": 0,
+            "recall10": 0.5,
+            "found": 0.8571428571428571,
+            "tokens": 1910.9795918367345,
+            "capped": 0.2857142857142857
+          },
+          "search_files, best single term": {
+            "rr": 0.16666666666666666,
+            "recall5": 0,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 2037.4285714285713,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 21.714285714285715,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 6.775510204081632,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.25,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 555.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.25,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 14,
+        "bestSearchTerm": "diagnostics@6",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          6,
+          4
+        ],
+        "attachedChars": 1943,
+        "allTermsMatchesByDir": {
+          "(root files)": 59,
+          ".vscode/": 2,
+          "sandbox/": 2,
+          "scripts/": 2,
+          "src/": 35
+        },
+        "allTermsMatchesInGold": 24
+      },
+      {
+        "id": "working-timer-approval",
+        "kind": "natural",
+        "set": "held out 1",
+        "terms": [
+          "elapsed",
+          "time",
+          "working",
+          "keeps",
+          "counting",
+          "waits",
+          "approval"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3296.285714285714,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.18009768009768012,
+            "recall5": 0.14285714285714285,
+            "recall10": 0.21428571428571427,
+            "found": 0.5714285714285714,
+            "tokens": 1061.8775510204082,
+            "capped": 0
+          },
+          "search_files, best single term": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 220.28571428571428,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 35.142857142857146,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 8.040816326530612,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 530.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "elapsed@1",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          2
+        ],
+        "attachedChars": 1858,
+        "allTermsMatchesByDir": {
+          "(root files)": 42,
+          "docs/": 4,
+          "sandbox/": 2,
+          "src/": 52
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "markdown-table-borders",
+        "kind": "natural",
+        "set": "held out 1",
+        "terms": [
+          "markdown",
+          "tables",
+          "replies",
+          "borders"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.1,
+            "recall5": 0,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 1608.2857142857142,
+            "capped": 0
+          },
+          "search_files, avg single term": {
+            "rr": 0.03125,
+            "recall5": 0,
+            "recall10": 0.25,
+            "found": 0.25,
+            "tokens": 412.57142857142856,
+            "capped": 0
+          },
+          "search_files, best single term": {
+            "rr": 0.125,
+            "recall5": 0,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 1538.857142857143,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 759.7142857142857,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 10,
+        "bestSearchTerm": "markdown@8",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          2
+        ],
+        "attachedChars": 2659,
+        "allTermsMatchesByDir": {
+          "(root files)": 7,
+          "sandbox/": 1,
+          "webview-ui/": 53
+        },
+        "allTermsMatchesInGold": 19
+      },
+      {
+        "id": "max-iterations-zero",
+        "kind": "identifier",
+        "set": "held out 1",
+        "terms": [
+          "setting",
+          "maxiterations",
+          "mean",
+          "step",
+          "limit"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.08333333333333333,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3347.4285714285716,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.2369047619047619,
+            "recall5": 0.3,
+            "recall10": 0.6,
+            "found": 1,
+            "tokens": 1179.3142857142857,
+            "capped": 0
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 88.57142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 6.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.2,
+            "recall5": 0.1,
+            "recall10": 0.1,
+            "found": 0.2,
+            "tokens": 4.742857142857142,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 6.571428571428571,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 690.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 12,
+        "bestSearchTerm": "mean@2",
+        "bestFindTerm": "setting@1",
+        "attachedRanks": [
+          1,
+          2
+        ],
+        "attachedChars": 2418,
+        "allTermsMatchesByDir": {
+          "(root files)": 40,
+          "sandbox/": 5,
+          "src/": 55
+        },
+        "allTermsMatchesInGold": 17
+      },
+      {
+        "id": "list-dir-limit",
+        "kind": "identifier",
+        "set": "held out 2",
+        "terms": [
+          "list_dir",
+          "cuts",
+          "big",
+          "folders",
+          "off",
+          "entries",
+          "raise",
+          "limit"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.045454545454545456,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3405.1428571428573,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.08333333333333333,
+            "recall5": 0.25,
+            "recall10": 0.25,
+            "found": 0.25,
+            "tokens": 642.4642857142857,
+            "capped": 0
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 507.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 243.42857142857142,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 22,
+        "bestSearchTerm": "list_dir@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1
+        ],
+        "attachedChars": 852,
+        "allTermsMatchesByDir": {
+          "(root files)": 27,
+          "docs/": 1,
+          "media/": 3,
+          "sandbox/": 5,
+          "src/": 42,
+          "test/": 22
+        },
+        "allTermsMatchesInGold": 8
+      },
+      {
+        "id": "command-timeout",
+        "kind": "natural",
+        "set": "held out 2",
+        "terms": [
+          "long",
+          "running",
+          "commands",
+          "time",
+          "out",
+          "minutes",
+          "let",
+          "agent",
+          "ask",
+          "more"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2922.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.021328671328671327,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0.3,
+            "tokens": 2123.057142857143,
+            "capped": 0.4
+          },
+          "search_files, best single term": {
+            "rr": 0.09090909090909091,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 2040.857142857143,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 35.142857142857146,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 6.9142857142857155,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 722.5714285714286,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "time@11",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1
+        ],
+        "attachedChars": 2529,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "malformed-webview-message",
+        "kind": "natural",
+        "set": "held out 2",
+        "terms": [
+          "ignore",
+          "malformed",
+          "messages",
+          "webview",
+          "throwing"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.043478260869565216,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 2824.285714285714,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.05928571428571429,
+            "recall5": 0,
+            "recall10": 0.2,
+            "found": 0.6,
+            "tokens": 1270.8571428571427,
+            "capped": 0.4
+          },
+          "search_files, best single term": {
+            "rr": 0.125,
+            "recall5": 0,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 529.4285714285714,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 6.857142857142857,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.799999999999999,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.2,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 649.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.2,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 23,
+        "bestSearchTerm": "ignore@8",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          5
+        ],
+        "attachedChars": 2272,
+        "allTermsMatchesByDir": {
+          "(root files)": 33,
+          "src/": 67
+        },
+        "allTermsMatchesInGold": 15
+      },
+      {
+        "id": "thinking-unsupported",
+        "kind": "natural",
+        "set": "held out 2",
+        "terms": [
+          "deployments",
+          "extended",
+          "thinking",
+          "support",
+          "fail",
+          "request"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.06666666666666667,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3334.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.26282051282051283,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.3333333333333333,
+            "found": 0.5,
+            "tokens": 1465,
+            "capped": 0.3333333333333333
+          },
+          "search_files, best single term": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 38.857142857142854,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 707.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 15,
+        "bestSearchTerm": "deployments@1",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2
+        ],
+        "attachedChars": 2475,
+        "allTermsMatchesByDir": {
+          "(root files)": 22,
+          ".vscode/": 1,
+          "docs/": 4,
+          "src/": 73
+        },
+        "allTermsMatchesInGold": 24
+      },
+      {
+        "id": "board-task-limit",
+        "kind": "natural",
+        "set": "held out 2",
+        "terms": [
+          "allow",
+          "more",
+          "than",
+          "tasks",
+          "plan",
+          "board"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.07142857142857142,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3252.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.09093915343915344,
+            "recall5": 0,
+            "recall10": 0.4166666666666667,
+            "found": 0.6666666666666666,
+            "tokens": 1906.2857142857144,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.16666666666666666,
+            "recall5": 0,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 464.2857142857143,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0.25,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 42,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.08333333333333333,
+            "recall5": 0.08333333333333333,
+            "recall10": 0.08333333333333333,
+            "found": 0.16666666666666666,
+            "tokens": 10.761904761904761,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 20.857142857142858,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 719.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 14,
+        "bestSearchTerm": "more@6",
+        "bestFindTerm": "board@2",
+        "attachedRanks": [
+          3,
+          2
+        ],
+        "attachedChars": 2517,
+        "allTermsMatchesByDir": {
+          "(root files)": 41,
+          ".vscode/": 2,
+          "docs/": 1,
+          "sandbox/": 15,
+          "src/": 41
+        },
+        "allTermsMatchesInGold": 31
+      },
+      {
+        "id": "read-file-binary",
+        "kind": "identifier",
+        "set": "held out 2",
+        "terms": [
+          "read_file",
+          "refuse",
+          "binary",
+          "files",
+          "clearer",
+          "message"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3504.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.14682539682539683,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.3333333333333333,
+            "found": 0.5,
+            "tokens": 1408.4285714285716,
+            "capped": 0.3333333333333333
+          },
+          "search_files, best single term": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 227.14285714285714,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.333333333333333,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 636,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "binary@2",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1
+        ],
+        "attachedChars": 2226,
+        "allTermsMatchesByDir": {
+          "(root files)": 49,
+          ".vscode/": 1,
+          "docs/": 1,
+          "sandbox/": 2,
+          "scripts/": 2,
+          "src/": 45
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "environment-git-hang",
+        "kind": "natural",
+        "set": "held out 2",
+        "terms": [
+          "git",
+          "calls",
+          "environment",
+          "summary",
+          "hang",
+          "huge",
+          "repositories"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3190.285714285714,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.03015873015873016,
+            "recall5": 0,
+            "recall10": 0.2857142857142857,
+            "found": 0.2857142857142857,
+            "tokens": 1614.4897959183675,
+            "capped": 0.42857142857142855
+          },
+          "search_files, best single term": {
+            "rr": 0.1111111111111111,
+            "recall5": 0,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 2442,
+            "capped": 1
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.448979591836734,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2.857142857142857,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 685.7142857142857,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "git@9",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2
+        ],
+        "attachedChars": 2400,
+        "allTermsMatchesByDir": {
+          "(root files)": 88,
+          "docs/": 4,
+          "sandbox/": 7,
+          "src/": 1
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "session-title-length",
+        "kind": "natural",
+        "set": "held out 2",
+        "terms": [
+          "chat",
+          "titles",
+          "cut",
+          "characters",
+          "history",
+          "list"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3111.1428571428573,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.04649054649054649,
+            "recall5": 0,
+            "recall10": 0.16666666666666666,
+            "found": 0.5,
+            "tokens": 1576.047619047619,
+            "capped": 0.5
+          },
+          "search_files, best single term": {
+            "rr": 0.1111111111111111,
+            "recall5": 0,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 2781.1428571428573,
+            "capped": 1
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 15.142857142857142,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.333333333333333,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 443.42857142857144,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "history@9",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2
+        ],
+        "attachedChars": 1552,
+        "allTermsMatchesByDir": {
+          "(root files)": 53,
+          "sandbox/": 8,
+          "src/": 39
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "blocked-patterns-invalid-regex-warning",
+        "kind": "identifier",
+        "set": "held out 3",
+        "terms": [
+          "put",
+          "invalid",
+          "regex",
+          "mitram",
+          "blockedcommandpatterns",
+          "silently",
+          "skipped",
+          "think",
+          "command",
+          "blocked",
+          "really",
+          "isn",
+          "show",
+          "warning",
+          "patterns",
+          "compile"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2892.285714285714,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.12855902777777778,
+            "recall5": 0.1875,
+            "recall10": 0.375,
+            "found": 0.75,
+            "tokens": 1256.642857142857,
+            "capped": 0.1875
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 511.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 26.857142857142858,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0.03125,
+            "recall5": 0.03125,
+            "recall10": 0.03125,
+            "found": 0.0625,
+            "tokens": 5.696428571428574,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0.5,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 26.857142857142858,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 716.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 0.5,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "compile@3",
+        "bestFindTerm": "command@2",
+        "attachedRanks": [
+          1,
+          null
+        ],
+        "attachedChars": 2509,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "run-command-forces-ci-env",
+        "kind": "identifier",
+        "set": "held out 3",
+        "terms": [
+          "run_command",
+          "always",
+          "sets",
+          "environment",
+          "makes",
+          "jest",
+          "config",
+          "pick",
+          "different",
+          "reporter",
+          "than",
+          "terminal",
+          "stop",
+          "forcing",
+          "least",
+          "override",
+          "already",
+          "set"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3608.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.029835390946502054,
+            "recall5": 0.05555555555555555,
+            "recall10": 0.1111111111111111,
+            "found": 0.16666666666666666,
+            "tokens": 825.9206349206348,
+            "capped": 0.1111111111111111
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 338,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 37.142857142857146,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.6031746031746055,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 492.57142857142856,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "already@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1
+        ],
+        "attachedChars": 1724,
+        "allTermsMatchesByDir": {
+          "(root files)": 73,
+          ".vscode/": 2,
+          "docs/": 5,
+          "media/": 3,
+          "sandbox/": 9,
+          "src/": 8
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "describe-error-404-show-host-and-deployment",
+        "kind": "identifier",
+        "set": "held out 3",
+        "terms": [
+          "describeerror",
+          "tells",
+          "endpoint",
+          "url",
+          "model",
+          "name",
+          "include",
+          "actual",
+          "host",
+          "deployment",
+          "tried",
+          "tell",
+          "wrong"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 1954.2857142857142,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.2245879120879121,
+            "recall5": 0.15384615384615385,
+            "recall10": 0.4230769230769231,
+            "found": 0.7692307692307693,
+            "tokens": 1251.296703296703,
+            "capped": 0.3076923076923077
+          },
+          "search_files, best single term": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 332,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 666,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "describeerror@1",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1,
+          3
+        ],
+        "attachedChars": 2331,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "second-project-folder-ignored",
+        "kind": "natural",
+        "set": "held out 3",
+        "terms": [
+          "project",
+          "folders",
+          "open",
+          "window",
+          "assistant",
+          "ever",
+          "sees",
+          "cannot",
+          "read",
+          "anything",
+          "second",
+          "folder",
+          "tag",
+          "file",
+          "nothing",
+          "gets",
+          "attached"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2097.1428571428573,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.05437982210428031,
+            "recall5": 0.058823529411764705,
+            "recall10": 0.14705882352941177,
+            "found": 0.47058823529411764,
+            "tokens": 1384.7058823529412,
+            "capped": 0.23529411764705882
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 287.7142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 38,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.462184873949581,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 863.7142857142857,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "folders@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          null
+        ],
+        "attachedChars": 3023,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "old-chats-disappear-from-list",
+        "kind": "natural",
+        "set": "held out 3",
+        "terms": [
+          "older",
+          "conversations",
+          "vanish",
+          "list",
+          "past",
+          "chats",
+          "deleted",
+          "cap",
+          "many",
+          "kept",
+          "like",
+          "hold",
+          "more"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.034482758620689655,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3442,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.030748663101604276,
+            "recall5": 0.07692307692307693,
+            "recall10": 0.07692307692307693,
+            "found": 0.23076923076923078,
+            "tokens": 623.5164835164835,
+            "capped": 0.15384615384615385
+          },
+          "search_files, best single term": {
+            "rr": 0.25,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 220.57142857142858,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.714285714285714,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.395604395604395,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 469.42857142857144,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.5,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 29,
+        "bestSearchTerm": "chats@4",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          2
+        ],
+        "attachedChars": 1643,
+        "allTermsMatchesByDir": {
+          "(root files)": 38,
+          ".vscode/": 4,
+          "docs/": 3,
+          "media/": 2,
+          "sandbox/": 6,
+          "scripts/": 1,
+          "src/": 46
+        },
+        "allTermsMatchesInGold": 3
+      },
+      {
+        "id": "big-tagged-file-only-first-chunk",
+        "kind": "natural",
+        "set": "held out 3",
+        "terms": [
+          "tag",
+          "big",
+          "file",
+          "model",
+          "gets",
+          "chunk",
+          "rest",
+          "quietly",
+          "chopped",
+          "off",
+          "send",
+          "more",
+          "least",
+          "tell",
+          "chat",
+          "cut",
+          "short"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3246.5714285714284,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.007985094490284802,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0.11764705882352941,
+            "tokens": 1124.2352941176473,
+            "capped": 0.17647058823529413
+          },
+          "search_files, best single term": {
+            "rr": 0.07692307692307693,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3217.4285714285716,
+            "capped": 1
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 10.571428571428571,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.65546218487395,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 586.5714285714286,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "model@13",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          null
+        ],
+        "attachedChars": 2053,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "long-answer-ends-abruptly-auto-resume",
+        "kind": "natural",
+        "set": "held out 3",
+        "terms": [
+          "sometimes",
+          "long",
+          "answer",
+          "ends",
+          "abruptly",
+          "middle",
+          "sentence",
+          "little",
+          "note",
+          "hitting",
+          "length",
+          "limit",
+          "then",
+          "sits",
+          "pick",
+          "stopped",
+          "itself",
+          "making",
+          "ask",
+          "again"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0.06666666666666667,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 1,
+            "tokens": 3826.8571428571427,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.13297619047619047,
+            "recall5": 0.2,
+            "recall10": 0.4,
+            "found": 0.4,
+            "tokens": 873.0857142857142,
+            "capped": 0.15
+          },
+          "search_files, best single term": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 287.14285714285717,
+            "capped": 1
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 23.714285714285715,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.257142857142858,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": 920.8571428571429,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 1,
+            "recall5": 1,
+            "recall10": 1,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": 15,
+        "bestSearchTerm": "stopped@1",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          1
+        ],
+        "attachedChars": 3223,
+        "allTermsMatchesByDir": {
+          "(root files)": 71,
+          ".vscode/": 3,
+          "docs/": 5,
+          "sandbox/": 12,
+          "src/": 9
+        },
+        "allTermsMatchesInGold": 4
+      },
+      {
+        "id": "status-lines-look-like-assistant-text",
+        "kind": "natural",
+        "set": "held out 3",
+        "terms": [
+          "status",
+          "lines",
+          "extension",
+          "itself",
+          "like",
+          "shortens",
+          "conversation",
+          "pauses",
+          "running",
+          "long",
+          "time",
+          "show",
+          "italics",
+          "under",
+          "assistant",
+          "wrote",
+          "separate",
+          "system",
+          "part",
+          "reply"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 3190.285714285714,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.04440832315832316,
+            "recall5": 0.03333333333333333,
+            "recall10": 0.08333333333333333,
+            "found": 0.4,
+            "tokens": 1093.0000000000002,
+            "capped": 0.1
+          },
+          "search_files, best single term": {
+            "rr": 0.2,
+            "recall5": 0.3333333333333333,
+            "recall10": 0.6666666666666666,
+            "found": 1,
+            "tokens": 1763.142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 22,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.714285714285716,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 969.4285714285714,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.125,
+            "recall5": 0,
+            "recall10": 0.6666666666666666,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "assistant@5",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          null,
+          null
+        ],
+        "attachedChars": 3393,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "urls-in-answers-not-clickable",
+        "kind": "natural",
+        "set": "held out 3",
+        "terms": [
+          "urls",
+          "assistant",
+          "puts",
+          "answers",
+          "clicked",
+          "plain",
+          "coloured",
+          "text",
+          "clicking",
+          "open",
+          "browser"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 1928.5714285714287,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.01515151515151515,
+            "recall5": 0,
+            "recall10": 0.0303030303030303,
+            "found": 0.09090909090909091,
+            "tokens": 765.1168831168831,
+            "capped": 0.18181818181818182
+          },
+          "search_files, best single term": {
+            "rr": 0.16666666666666666,
+            "recall5": 0,
+            "recall10": 0.3333333333333333,
+            "found": 1,
+            "tokens": 1763.142857142857,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 37.42857142857143,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 7.2987012987013005,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 689.1428571428571,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "assistant@6",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          null,
+          null
+        ],
+        "attachedChars": 2412,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      },
+      {
+        "id": "keyboard-yes-no-on-pending-change",
+        "kind": "natural",
+        "set": "held out 3",
+        "terms": [
+          "like",
+          "say",
+          "yes",
+          "pending",
+          "file",
+          "keyboard",
+          "enter",
+          "esc",
+          "reaching",
+          "mouse",
+          "time"
+        ],
+        "scores": {
+          "search_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 2538,
+            "capped": 1
+          },
+          "search_files, avg single term": {
+            "rr": 0.03898071625344352,
+            "recall5": 0.045454545454545456,
+            "recall10": 0.045454545454545456,
+            "found": 0.2727272727272727,
+            "tokens": 1313.4025974025974,
+            "capped": 0.18181818181818182
+          },
+          "search_files, best single term": {
+            "rr": 0.3333333333333333,
+            "recall5": 0.5,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": 233.71428571428572,
+            "capped": 0
+          },
+          "find_files, all terms": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 18.285714285714285,
+            "capped": 0
+          },
+          "find_files, avg single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 5.142857142857142,
+            "capped": 0
+          },
+          "find_files, best single term": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 4.285714285714286,
+            "capped": 0
+          },
+          "pre-pass, attached block": {
+            "rr": 0,
+            "recall5": 0,
+            "recall10": 0,
+            "found": 0,
+            "tokens": 585.4285714285714,
+            "capped": 0
+          },
+          "pre-pass, ranking only (no gate)": {
+            "rr": 0.1,
+            "recall5": 0,
+            "recall10": 0.5,
+            "found": 1,
+            "tokens": null,
+            "capped": 0
+          }
+        },
+        "allTermsRank": null,
+        "bestSearchTerm": "keyboard@3",
+        "bestFindTerm": null,
+        "attachedRanks": [
+          null,
+          null
+        ],
+        "attachedChars": 2049,
+        "allTermsMatchesByDir": {
+          "(root files)": 100
+        },
+        "allTermsMatchesInGold": 0
+      }
+    ]
+  },
+  "latency": {
+    "corpora": {
+      "snapshot": {
+        "files": 118,
+        "mb": 1.678508,
+        "searchedMb": 1.678508
+      },
+      "workspace": {
+        "files": 150,
+        "mb": 3.102655,
+        "searchedMb": 3.102655
+      },
+      "large": {
+        "files": 9947,
+        "mb": 218.081452,
+        "searchedMb": 57.778222
+      }
+    },
+    "prepass": {
+      "snapshot": {
+        "files": 103,
+        "buildMs": 60.13865000000078,
+        "memoryMb": -5.232485
+      },
+      "workspace": {
+        "files": 128,
+        "buildMs": 75.97121400000105,
+        "memoryMb": -7.127301
+      },
+      "large": {
+        "files": 7581,
+        "buildMs": 4088.3584200000005,
+        "memoryMb": 11.757943
+      }
+    },
+    "timings": [
+      {
+        "corpus": "snapshot",
+        "op": "walk (list every file)",
+        "firstMs": 4.002198000000135,
+        "medianMs": 2.702744000000166,
+        "maxMs": 3.031938000000082
+      },
+      {
+        "corpus": "snapshot",
+        "op": "find_files *runTracker*",
+        "firstMs": 3.6087310000002617,
+        "medianMs": 3.3696799999997893,
+        "maxMs": 4.47766700000102
+      },
+      {
+        "corpus": "snapshot",
+        "op": "search_files, no match (full scan)",
+        "firstMs": 92.02969900000062,
+        "medianMs": 114.74990499999876,
+        "maxMs": 130.8901760000008
+      },
+      {
+        "corpus": "snapshot",
+        "op": "search_files, typical request",
+        "firstMs": 6.113765999998577,
+        "medianMs": 4.044789999999921,
+        "maxMs": 4.827782000000298
+      },
+      {
+        "corpus": "snapshot",
+        "op": "pre-pass: refresh index, no changes",
+        "firstMs": 11.985361000000921,
+        "medianMs": 11.559205999999904,
+        "maxMs": 14.182105999998385
+      },
+      {
+        "corpus": "snapshot",
+        "op": "pre-pass: retrieve (search + excerpts)",
+        "firstMs": 14.95347000000038,
+        "medianMs": 12.652775999998994,
+        "maxMs": 15.59342800000013
+      },
+      {
+        "corpus": "workspace",
+        "op": "walk (list every file)",
+        "firstMs": 2.4605850000007194,
+        "medianMs": 2.1094240000002173,
+        "maxMs": 3.216646999999284
+      },
+      {
+        "corpus": "workspace",
+        "op": "find_files *runTracker*",
+        "firstMs": 4.55235200000061,
+        "medianMs": 7.355587000000014,
+        "maxMs": 8.045858999999837
+      },
+      {
+        "corpus": "workspace",
+        "op": "search_files, no match (full scan)",
+        "firstMs": 133.99294499999996,
+        "medianMs": 137.3985360000006,
+        "maxMs": 153.32453799999894
+      },
+      {
+        "corpus": "workspace",
+        "op": "search_files, typical request",
+        "firstMs": 23.692603999999847,
+        "medianMs": 25.684445000002597,
+        "maxMs": 27.48790700000245
+      },
+      {
+        "corpus": "workspace",
+        "op": "pre-pass: refresh index, no changes",
+        "firstMs": 12.394083999999566,
+        "medianMs": 7.021150000000489,
+        "maxMs": 8.574054000000615
+      },
+      {
+        "corpus": "workspace",
+        "op": "pre-pass: retrieve (search + excerpts)",
+        "firstMs": 14.087116999999125,
+        "medianMs": 11.4264660000008,
+        "maxMs": 17.58281899999929
+      },
+      {
+        "corpus": "large",
+        "op": "walk (list every file)",
+        "firstMs": 53.27012399999876,
+        "medianMs": 54.377674999999726,
+        "maxMs": 80.81440400000065
+      },
+      {
+        "corpus": "large",
+        "op": "find_files *runTracker*",
+        "firstMs": 166.9437100000032,
+        "medianMs": 120.68041699999958,
+        "maxMs": 307.03017700000055
+      },
+      {
+        "corpus": "large",
+        "op": "search_files, no match (full scan)",
+        "firstMs": 1227.666250000002,
+        "medianMs": 1236.8755700000002,
+        "maxMs": 1555.3409829999982
+      },
+      {
+        "corpus": "large",
+        "op": "search_files, typical request",
+        "firstMs": 4.3968150000000605,
+        "medianMs": 6.1116409999995085,
+        "maxMs": 7.423016999997344
+      },
+      {
+        "corpus": "large",
+        "op": "pre-pass: refresh index, no changes",
+        "firstMs": 403.72866500000237,
+        "medianMs": 409.5523899999971,
+        "maxMs": 440.2533320000002
+      },
+      {
+        "corpus": "large",
+        "op": "pre-pass: retrieve (search + excerpts)",
+        "firstMs": 75.83772699999827,
+        "medianMs": 55.21066200000496,
+        "maxMs": 63.41355900000053
+      },
+      {
+        "corpus": "workspace",
+        "op": "git branch --show-current",
+        "firstMs": 6.844189999996161,
+        "medianMs": 5.616191999994044,
+        "maxMs": 5.820816000006744
+      },
+      {
+        "corpus": "workspace",
+        "op": "git diff --stat",
+        "firstMs": 14.221609000000171,
+        "medianMs": 12.796298000001116,
+        "maxMs": 15.890395000002172
+      },
+      {
+        "corpus": "workspace",
+        "op": "read one 30 KB file (attached context)",
+        "firstMs": 1.1587999999974272,
+        "medianMs": 0.4625640000012936,
+        "maxMs": 0.6415100000012899
+      }
+    ]
+  }
+}

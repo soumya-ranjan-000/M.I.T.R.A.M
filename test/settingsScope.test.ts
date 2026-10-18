@@ -7,7 +7,7 @@ const properties: Record<string, { scope?: string }> = manifest.contributes.conf
 
 describe('security-sensitive settings', () => {
   // A cloned repository's .vscode/settings.json must not be able to redirect the API key or skip approvals.
-  it.each(['mitram.endpoint', 'mitram.autoApproveEdits', 'mitram.autoApproveSafeCommands', 'mitram.autoApproveCommands'])(
+  it.each(['mitram.endpoint', 'mitram.skipApprovalPrompts', 'mitram.autoApproveEdits', 'mitram.autoApproveSafeCommands', 'mitram.autoApproveCommands'])(
     '%s is read from user settings only',
     (key) => expect(properties[key]?.scope).toBe('application'),
   );

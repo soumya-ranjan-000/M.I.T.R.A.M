@@ -7,6 +7,8 @@ import { gatherEnvironment } from '../agent/gatherEnvironment';
 import { loadProjectInstructions } from '../agent/projectInstructions';
 import { buildUserContent } from '../agent/ContextBuilder';
 import { gatherContext } from '../agent/gatherContext';
+import { Retrieval, Retriever } from '../agent/retrieve';
+import { resolveInWorkspace } from '../safety/workspaceGuard';
 import { pruneAttachments } from '../agent/attachments';
 import { ReadResult, readAttachment } from '../agent/fileReaders';
 import { buildSystemPrompt } from '../agent/SystemPrompt';
@@ -72,6 +74,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private readonly toolNames = new Map<string, string>();
   private lastEditor?: vscode.TextEditor;
   private fileCache?: { at: number; files: string[] };
+  private readonly retriever = new Retriever((message) => this.logger.info(message));
   private loaded?: Promise<void>;
   private readonly pendingApprovals = new Map<string, (d: ApprovalDecision) => void>();
   private readonly alwaysAllowed = new Set<string>();
@@ -94,6 +97,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   ) {
     this.lastEditor = pickEditor(vscode.window.activeTextEditor);
     subscriptions.push(
+      { dispose: () => this.retriever.dispose() },
       vscode.window.onDidChangeActiveTextEditor((e) => {
         this.lastEditor = pickEditor(e) ?? this.lastEditor;
         this.postContextInfo();
@@ -212,6 +216,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'viewDiff':
         await this.viewDiff(message.id);
         break;
+      case 'openFile':
+        await this.openFile(message.path, message.line);
+        break;
       case 'revert':
         await this.revert();
         break;
@@ -246,6 +253,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       if (active) this.session = active;
     });
     await this.loaded;
+    // Build the code index while the user types, so the first message doesn't wait for it.
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (root && readSettings().retrieveContext) void this.retriever.warm(root);
     this.postSessions();
     this.post({ type: 'loadMessages', messages: this.session.display });
     // The view is rebuilt each time it is shown again, so restore what loadMessages resets.
@@ -391,8 +401,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const turnStart = session.history.length;
     const rootForEnv = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const environment =
-      settings.includeEnvironment && rootForEnv ? formatEnvironment(await gatherEnvironment(rootForEnv)) : '';
+    const envInfo = settings.includeEnvironment && rootForEnv ? await gatherEnvironment(rootForEnv) : undefined;
+    // Code a keyword search matched to the message, so the model can start there instead of searching.
+    const retrieved: Retrieval =
+      settings.retrieveContext && rootForEnv && !run.continueTask && run.text.trim()
+        ? await this.retriever.retrieve(rootForEnv, run.text, {
+            exclude: parts.flatMap((p) => (p.kind === 'attachment' ? [] : [p.path])),
+            boost: envInfo?.openTabs,
+          })
+        : { files: [], block: '' };
+    const environment = [envInfo ? formatEnvironment(envInfo) : '', retrieved.block].filter(Boolean).join('\n');
     session.history.push({ role: 'user', content: buildUserContent(run.text, parts, environment, run.images, run.files) });
     const pruned = pruneAttachments(session.history);
     if (!isRetry) {
@@ -404,6 +422,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         ...(run.files.length ? { files: run.files.map((f) => ({ ...f, data: '' })) } : {}),
       });
       if (session.display.length === 1) session.title = titleFrom(run.text || run.files[0]?.name || 'Image');
+    }
+    if (!isRetry && retrieved.files.length) {
+      // Show what was attached, so the user can see what the agent started from.
+      const files = retrieved.files.map(({ path, startLine, endLine }) => ({ path, startLine, endLine }));
+      this.emit(session, { type: 'retrieved', files });
     }
     if (pruned > 0) {
       this.emit(session, {
@@ -461,6 +484,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             tool.name,
             input,
             {
+              skipApprovalPrompts: settings.skipApprovalPrompts,
               autoApproveEdits: settings.autoApproveEdits,
               autoApproveSafeCommands: settings.autoApproveSafeCommands,
               autoApproveCommands: compileAnchoredPatterns(settings.autoApproveCommands),
@@ -491,6 +515,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     } finally {
       if (this.abort === abort) this.abort = undefined;
+      // Pick up the files this run changed, so the next message's search sees them.
+      if (root && settings.retrieveContext) void this.retriever.warm(root);
       this.pendingApprovals.clear();
       this.pendingTools.clear();
       await this.store.save(session);
@@ -727,6 +753,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (checkpoint.size === 0) this.checkpoints.delete(session.id);
     await this.store.save(session);
     this.postCheckpoint();
+  }
+
+  /** Opens a workspace file at a line, for the links in the "related files" card. */
+  private async openFile(rel: string, line: number): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const abs = root ? await resolveInWorkspace(root, rel) : null;
+    if (!abs) return;
+    try {
+      const at = new vscode.Position(line - 1, 0);
+      await vscode.window.showTextDocument(vscode.Uri.file(abs), { selection: new vscode.Range(at, at), preview: true });
+    } catch {
+      void vscode.window.showWarningMessage(`M.I.T.R.A.M: Could not open ${rel}.`);
+    }
   }
 
   private async insertCode(code: string): Promise<void> {

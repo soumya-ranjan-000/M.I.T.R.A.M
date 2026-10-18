@@ -2,7 +2,7 @@
   "name": "mitram",
   "displayName": "M.I.T.R.A.M",
   "description": "A standalone AI coding agent with chat and tool use.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/soumya-ranjan-000/M.I.T.R.A.M.git"
@@ -96,6 +96,12 @@
           "default": 60,
           "description": "Maximum model/tool steps for one message. When reached, the agent pauses and offers a Continue button."
         },
+        "mitram.skipApprovalPrompts": {
+          "scope": "application",
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Skip approval prompts for file edits, file creation and commands. Commands blocked by M.I.T.R.A.M's safety policy remain blocked. Read from user settings only. Off by default."
+        },
         "mitram.autoApproveEdits": {
           "scope": "application",
           "type": "boolean",
@@ -130,6 +136,11 @@
           "type": "boolean",
           "default": true,
           "description": "Send open tabs, the git branch and diff summary, and current errors with each message."
+        },
+        "mitram.retrieveContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Before each message, search the workspace locally for code related to it and attach the best matches: a short list of files and line ranges, and excerpts from the top two. Adds up to about 1,400 tokens, and only when the match is confident."
         },
         "mitram.autoApproveCommands": {
           "scope": "application",
@@ -189,6 +200,7 @@
     "install:all": "npm install && npm --prefix webview-ui install",
     "eval:build": "esbuild test/evals/run.ts --bundle --platform=node --target=node20 --outfile=dist/evals.js --log-level=warning",
     "eval": "npm run eval:build && node dist/evals.js",
+    "bench:retrieval": "esbuild test/retrieval/bench.ts --bundle --platform=node --target=node20 --outfile=dist/retrieval-bench.js --log-level=warning && node --expose-gc dist/retrieval-bench.js",
     "test:coverage": "vitest run --coverage",
     "build:prod": "node esbuild.js --production && npm --prefix webview-ui run build",
     "vscode:prepublish": "npm run build:prod",
@@ -206,7 +218,8 @@
   },
   "dependencies": {
     "@anthropic-ai/foundry-sdk": "^0.6.0",
-    "@anthropic-ai/sdk": "^0.135.0"
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@modelcontextprotocol/sdk": "^1.32.1"
   },
   "icon": "media/icon.png",
   "keywords": [

@@ -41,7 +41,7 @@ Ask about your code or ask for a change. The current file is attached automatica
 <p align="center"><img src="media/screenshots/01-welcome.png" alt="The welcome screen of the chat panel" width="360"></p>
 
 ### It reads before it answers
-The agent searches and reads your files (and your editor's error list) before it replies, and each step is shown as a card you can expand.
+The agent searches and reads your files (and your editor's error list) before it replies, and each step is shown as a card you can expand. To give it a head start, each message also carries the files a local keyword search matched to it, with short excerpts from the top two, so the agent can often go straight to the right code. A card under your message lists them; click one to open it.
 
 <p align="center"><img src="media/screenshots/02-understand-code.png" alt="The agent reasoning, searching and reading files, then answering" width="360"></p>
 
@@ -96,11 +96,11 @@ Things that keep a long run on track:
 
 ## You stay in control
 
-- **Approval.** Every edit, new file and command asks first. Edits show a **View diff** button that opens VS Code's diff editor.
+- **Approval.** By default, every edit, new file and command asks first. Set `mitram.skipApprovalPrompts` to skip those prompts; commands blocked by the safety policy remain blocked. Edits show a **View diff** button when approval is requested.
 - **Blocked outright.** Obviously destructive commands (`sudo`, `rm -rf /`, `curl … | sh`, force-push, and similar) are refused without asking. You can add your own patterns with `mitram.blockedCommandPatterns`. This is a safety net, not a sandbox: the approval prompt is your real protection.
 - **Revert.** After a turn that changed files, **Revert changes** restores them. A file you edited yourself afterwards is left alone. Changes made by commands the agent ran are not tracked.
 - **Workspace only.** File tools cannot read or write outside the open folder, including through symlinks.
-- **Optional auto-approve**, all off by default: `mitram.autoApproveEdits`, `mitram.autoApproveSafeCommands` (`pwd`, `ls`, read-only `git`) and `mitram.autoApproveCommands` (a list of commands you trust in every workspace, each matched as a whole; anything chained with `;`, `&`, `|` or redirects always asks). These are read from your user settings only, so a repository's `.vscode/settings.json` cannot switch them on.
+- **Optional auto-approve**, all off by default: `mitram.skipApprovalPrompts` skips prompts for edits, file creation and commands; commands blocked by the safety policy remain blocked. For narrower control, use `mitram.autoApproveEdits`, `mitram.autoApproveSafeCommands` (`pwd`, `ls`, read-only `git`) and `mitram.autoApproveCommands` (a list of commands you trust in every workspace, each matched as a whole; anything chained with `;`, `&`, `|` or redirects always asks unless the master setting is on). These are read from your user settings only, so a repository's `.vscode/settings.json` cannot switch them on.
 - **Per-project command rules.** **Always allow** on a command card saves a rule in VS Code's storage for this workspace, not in a file a repository could ship. Review them with `/permissions` or **M.I.T.R.A.M: Manage Always-Allowed Commands**.
 
 ## Settings
@@ -117,7 +117,8 @@ Things that keep a long run on track:
 | `mitram.contextWindow` | Your deployment's context size. Older context is trimmed above about 70% of it |
 | `mitram.promptCaching` | Cache the prompt prefix to cut cost and latency. Turn off if your deployment rejects it |
 | `mitram.includeEnvironment` | Send open tabs, git branch and diff summary, and current errors with each message |
-| `mitram.autoApprove*`, `mitram.blockedCommandPatterns` | See above |
+| `mitram.retrieveContext` | Before each message, search the workspace locally and attach the best-matching files and short excerpts, only when the match is confident (default on) |
+| `mitram.skipApprovalPrompts`, `mitram.autoApprove*`, `mitram.blockedCommandPatterns` | See above |
 
 ## Project instructions
 
@@ -126,7 +127,7 @@ Run **M.I.T.R.A.M: Create Project Instructions (MITRAM.md)** to create a `MITRAM
 ## Privacy
 
 - **No telemetry.** This extension does not collect or send usage data.
-- **Where your data goes.** The only network traffic is to the endpoint you configure. It is read from your user settings only, so a repository's `.vscode/settings.json` cannot redirect your requests or API key. Each request contains your message, files, selections and images you attach, the results of tools the agent ran (file contents, command output), the agent's plan board, and, unless you turn it off, the environment summary described above. When a long conversation is summarised, the earlier part of it is sent to the same endpoint to be summarised.
+- **Where your data goes.** The only network traffic is to the endpoint you configure. It is read from your user settings only, so a repository's `.vscode/settings.json` cannot redirect your requests or API key. Each request contains your message, files, selections and images you attach, the results of tools the agent ran (file contents, command output), the agent's plan board, and, unless you turn them off, the environment summary described above and the files and excerpts a local search matched to your message. The search index is built on your machine and kept in memory only. When a long conversation is summarised, the earlier part of it is sent to the same endpoint to be summarised.
 - **Your API key** is kept in VS Code's secret storage and is never written to settings, logs or chat history.
 - **Chats** are stored locally in VS Code's extension storage on your machine. To keep that small, saved chats keep the images and PDFs of only their last two messages with them, in your three most recent chats; older images show as "image (not kept)". Text read from attached files is kept like any other attached context.
 - **Logs** (`M.I.T.R.A.M: Show Logs`) are local, contain no prompts, file contents or command output, and have anything resembling a credential redacted. **Copy Diagnostics for Bug Report** includes only versions, settings and the endpoint's host name.
