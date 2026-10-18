@@ -38,6 +38,10 @@ export function applyHostEvent(messages: DisplayMessage[], event: HostToWebview)
           ? { ...m, status: event.status, output: event.output ?? m.output }
           : m,
       );
+    case 'toolAllowRule':
+      return messages.map((m) =>
+        m.role === 'tool' && m.id === event.id ? { ...m, allowRule: { label: event.label, usesShell: event.usesShell } } : m,
+      );
     case 'notice':
       return [...messages, { role: 'assistant', text: `_${event.text}_` }];
     default:

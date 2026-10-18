@@ -4,6 +4,7 @@ import type { ChatMessage } from '../providers/ModelProvider';
 
 import type { Board, DisplayMessage } from '../webview/protocol';
 import { emptyBoard } from '../agent/board';
+import { dropAttachments, hasAttachments } from '../agent/attachments';
 
 export interface Session {
   id: string;
@@ -23,6 +24,10 @@ interface Persisted {
 }
 
 const MAX_SESSIONS = 50;
+// Images and PDFs are large, so on disk only the latest few messages with them keep them, in the
+// most recent chats. The chat in memory is untouched, so the model still sees them this session.
+const KEEP_IMAGE_MESSAGES = 2;
+const KEEP_IMAGE_SESSIONS = 3;
 
 export function newSession(): Session {
   return {
@@ -38,6 +43,31 @@ export function newSession(): Session {
 export function titleFrom(text: string): string {
   const oneLine = text.replace(/\s+/g, ' ').trim();
   return oneLine.length > 50 ? oneLine.slice(0, 49) + '…' : oneLine || 'New chat';
+}
+
+/** A copy of the session to write to disk, with image and PDF data kept only for its latest `keep` messages that have them. */
+export function forStorage(session: Session, keep: number): Session {
+  let keptShown = 0;
+  const display = session.display
+    .slice()
+    .reverse()
+    .map((m) => {
+      if (m.role !== 'user' || !m.images?.length || keptShown++ < keep) return m;
+      return { ...m, images: m.images.map((image) => ({ ...image, data: '' })) };
+    })
+    .reverse();
+  let keptSent = 0;
+  const history = session.history
+    .slice()
+    .reverse()
+    .map((m) => {
+      if (!hasAttachments(m) || keptSent++ < keep) return m;
+      const copy = { ...m };
+      dropAttachments(copy, 'not kept');
+      return copy;
+    })
+    .reverse();
+  return { ...session, display, history };
 }
 
 export class SessionStore {
@@ -91,7 +121,12 @@ export class SessionStore {
   }
 
   private async flush(): Promise<void> {
+    const recent = new Set(this.list().slice(0, KEEP_IMAGE_SESSIONS).map((s) => s.id));
+    const data: Persisted = {
+      ...this.data,
+      sessions: this.data.sessions.map((s) => forStorage(s, recent.has(s.id) ? KEEP_IMAGE_MESSAGES : 0)),
+    };
     await fs.mkdir(path.dirname(this.file), { recursive: true });
-    await fs.writeFile(this.file, JSON.stringify(this.data));
+    await fs.writeFile(this.file, JSON.stringify(data));
   }
 }

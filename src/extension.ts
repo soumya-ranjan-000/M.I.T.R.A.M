@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { INSTRUCTIONS_FILE, INSTRUCTIONS_TEMPLATE } from './agent/projectInstructions';
 import { Logger, buildDiagnostics } from './logging';
+import { CommandRuleStore } from './storage/commandRules';
 import { SecretStore } from './storage/secrets';
 import { readSettings } from './storage/settings';
 import { SessionStore } from './storage/sessions';
@@ -16,7 +17,18 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('M.I.T.R.A.M', { log: true });
   const logger = new Logger(output);
   const proposals = new ProposalContentProvider();
-  const chat = new ChatViewProvider(context.extensionUri, secrets, sessions, proposals, context.globalState, logger, context.subscriptions);
+  // "Always allow" command rules are per project, like chats.
+  const commandRules = new CommandRuleStore(context.workspaceState);
+  const chat = new ChatViewProvider(
+    context.extensionUri,
+    secrets,
+    sessions,
+    proposals,
+    context.globalState,
+    commandRules,
+    logger,
+    context.subscriptions,
+  );
 
   context.subscriptions.push(
     output,
@@ -49,6 +61,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chat),
     vscode.commands.registerCommand('mitram.focusChat', () => chat.focus()),
     vscode.commands.registerCommand('mitram.newChat', () => chat.newChat()),
+    vscode.commands.registerCommand('mitram.manageAllowedCommands', () => chat.manageAllowedCommands()),
     vscode.commands.registerCommand('mitram.setApiKey', async () => {
       const key = await vscode.window.showInputBox({
         title: 'M.I.T.R.A.M: Azure Foundry API Key',

@@ -6,6 +6,8 @@ const DEFAULT_TIMEOUT_S = 120;
 const MAX_TIMEOUT_S = 600;
 const MAX_OUTPUT_CHARS = 30_000;
 const MAX_CAPTURE_CHARS = 1_000_000;
+// Roughly what fits on a tool card's header line in a narrow side bar.
+const SUMMARY_MAX_CHARS = 40;
 
 export const runCommandTool: Tool = {
   name: 'run_command',
@@ -22,7 +24,15 @@ export const runCommandTool: Tool = {
     required: ['command'],
   },
   requiresApproval: true,
-  preview: (input) => ({ summary: `Run: ${(input as { command?: string })?.command ?? ''}` }),
+  preview: (input) => {
+    const command = String((input as { command?: unknown } | null)?.command ?? '').trim();
+    const lines = command.split(/\r?\n/);
+    return {
+      summary: `Run: ${lines.length > 1 ? `${lines[0]} …` : command}`,
+      // The one-line summary gets cut off, so show the whole command before it is approved.
+      detail: lines.length > 1 || command.length > SUMMARY_MAX_CHARS ? command : undefined,
+    };
+  },
   policy: (input, ctx) => checkCommand(reqString(input, 'command'), ctx.blockedCommandPatterns),
   async run(input, ctx) {
     const command = reqString(input, 'command');

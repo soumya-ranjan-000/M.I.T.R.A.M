@@ -5,30 +5,52 @@ import { emptyBoard } from '../agent/board';
 import { formatEnvironment } from '../agent/environment';
 import { gatherEnvironment } from '../agent/gatherEnvironment';
 import { loadProjectInstructions } from '../agent/projectInstructions';
-import { formatUserMessage } from '../agent/ContextBuilder';
+import { buildUserContent } from '../agent/ContextBuilder';
 import { gatherContext } from '../agent/gatherContext';
+import { pruneAttachments } from '../agent/attachments';
+import { ReadResult, readAttachment } from '../agent/fileReaders';
 import { buildSystemPrompt } from '../agent/SystemPrompt';
 import { AnthropicProvider } from '../providers/AnthropicProvider';
 import { describeError } from '../providers/ModelProvider';
+import { CommandRuleStore } from '../storage/commandRules';
 import { SecretStore } from '../storage/secrets';
 import { Session, SessionStore, newSession, titleFrom } from '../storage/sessions';
 import { readSettings } from '../storage/settings';
 import { Checkpoint, withCheckpoint } from '../safety/checkpoints';
 import { isAutoApproved } from '../safety/approvalPolicy';
-import { compileAnchoredPatterns, compilePatterns } from '../safety/commandPolicy';
+import {
+  CommandRule,
+  compileAnchoredPatterns,
+  compilePatterns,
+  describeRule,
+  hasShellSyntax,
+  suggestCommandRule,
+} from '../safety/commandPolicy';
 import { Logger } from '../logging';
 import { createDefaultRegistry } from '../tools';
 import { ToolRegistry } from '../tools/Tool';
 import { createDiagnosticsReader, createVscodeFilePort } from '../tools/vscodeHost';
 import { applyHostEvent } from './displayReducer';
 import { ProposalContentProvider } from './ProposalContentProvider';
-import { ApprovalDecision, HostToWebview, WebviewToHost, isWebviewToHost } from './protocol';
+import {
+  ApprovalDecision,
+  FileAttachment,
+  HostToWebview,
+  ImageAttachment,
+  MAX_FILES,
+  MAX_IMAGES,
+  MAX_UPLOAD_BYTES,
+  WebviewToHost,
+  isWebviewToHost,
+} from './protocol';
 
 interface Run {
   text: string;
   includeActive: boolean;
   mentions: string[];
   plan: boolean;
+  images: ImageAttachment[];
+  files: FileAttachment[];
   /** A resumed run: keep the earlier revert point so the whole task can be undone together. */
   continueTask?: boolean;
 }
@@ -55,6 +77,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private readonly alwaysAllowed = new Set<string>();
   private readonly pendingTools = new Map<string, ApprovalRequest>();
   private readonly checkpoints = new Map<string, Checkpoint>();
+  // Kept for a view that is opened again mid-run: VS Code rebuilds a hidden view from scratch.
+  private runStartedAt = 0;
+  private runPlan = false;
+  private lastUsage?: { sessionId: string; message: Extract<HostToWebview, { type: 'usage' }> };
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -62,6 +88,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly store: SessionStore,
     private readonly proposals: ProposalContentProvider,
     private readonly state: vscode.Memento,
+    private readonly commandRules: CommandRuleStore,
     private readonly logger: Logger,
     subscriptions: vscode.Disposable[],
   ) {
@@ -130,7 +157,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'sendMessage':
         await this.run(
-          { text: message.text, includeActive: message.includeActive, mentions: message.mentions, plan: message.plan },
+          {
+            text: message.text,
+            includeActive: message.includeActive,
+            mentions: message.mentions,
+            plan: message.plan,
+            images: message.images,
+            files: message.files,
+          },
           false,
         );
         break;
@@ -163,6 +197,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'pickModel':
         await this.pickModel();
         break;
+      case 'managePermissions':
+        await this.manageAllowedCommands();
+        break;
+      case 'pickFiles':
+        await this.pickFiles();
+        break;
+      case 'readFiles':
+        await this.readFiles(message.uris);
+        break;
+      case 'attachFileData':
+        this.deliverAttachments([readAttachment(message.name, Buffer.from(message.data, 'base64'))]);
+        break;
       case 'viewDiff':
         await this.viewDiff(message.id);
         break;
@@ -174,7 +220,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'continueRun':
         await this.run(
-          { text: 'Continue where you left off.', includeActive: false, mentions: [], plan: false, continueTask: true },
+          { text: 'Continue where you left off.', includeActive: false, mentions: [], plan: false, images: [], files: [], continueTask: true },
           false,
         );
         break;
@@ -202,6 +248,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     await this.loaded;
     this.postSessions();
     this.post({ type: 'loadMessages', messages: this.session.display });
+    // The view is rebuilt each time it is shown again, so restore what loadMessages resets.
+    if (this.abort) this.post({ type: 'runInProgress', since: this.runStartedAt, plan: this.runPlan });
+    if (this.lastUsage?.sessionId === this.session.id) this.post(this.lastUsage.message);
+    this.postCheckpoint();
     this.postBoard();
     this.postContextInfo();
     this.postModel();
@@ -307,7 +357,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.post({
         type: 'error',
         message: !settings.endpoint
-          ? 'No endpoint configured. Set "mitram.endpoint" to your Azure Foundry URL.'
+          ? 'No endpoint configured. Set "mitram.endpoint" in your user settings to your Azure Foundry URL.'
           : 'No API key set. Run "M.I.T.R.A.M: Set API Key".',
         needsSetup: true,
       });
@@ -327,6 +377,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.abort?.abort();
     const abort = new AbortController();
     this.abort = abort;
+    this.runStartedAt = Date.now();
+    this.runPlan = run.plan;
     this.lastRun = run;
 
     this.contextWindow = settings.contextWindow;
@@ -341,10 +393,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const rootForEnv = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const environment =
       settings.includeEnvironment && rootForEnv ? formatEnvironment(await gatherEnvironment(rootForEnv)) : '';
-    session.history.push({ role: 'user', content: formatUserMessage(run.text, parts, environment) });
+    session.history.push({ role: 'user', content: buildUserContent(run.text, parts, environment, run.images, run.files) });
+    const pruned = pruneAttachments(session.history);
     if (!isRetry) {
-      session.display.push({ role: 'user', text: run.text });
-      if (session.display.length === 1) session.title = titleFrom(run.text);
+      session.display.push({
+        role: 'user',
+        text: run.text,
+        ...(run.images.length ? { images: run.images } : {}),
+        // The transcript only shows what was attached; the content is in the history.
+        ...(run.files.length ? { files: run.files.map((f) => ({ ...f, data: '' })) } : {}),
+      });
+      if (session.display.length === 1) session.title = titleFrom(run.text || run.files[0]?.name || 'Image');
+    }
+    if (pruned > 0) {
+      this.emit(session, {
+        type: 'notice',
+        text: `Removed ${pruned} older image${pruned === 1 ? '' : 's'} or PDF${pruned === 1 ? '' : 's'} from the conversation to stay within the request size limit.`,
+      });
     }
 
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
@@ -399,10 +464,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
               autoApproveEdits: settings.autoApproveEdits,
               autoApproveSafeCommands: settings.autoApproveSafeCommands,
               autoApproveCommands: compileAnchoredPatterns(settings.autoApproveCommands),
+              // Read the saved rules on every call, so "Always allow" applies within this run too.
+              allowedCommands: this.commandRules.list(),
             },
             this.alwaysAllowed,
           ),
-        requestApproval: (request) => this.askApproval(request, abort.signal),
+        requestApproval: (request) => this.askApproval(session, request, abort.signal),
       });
       this.lastRun = undefined;
       this.post({ type: 'streamEnd' });
@@ -458,25 +525,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.logger.info(`run paused: ${event.reason} after ${event.steps} steps`);
         if (session === this.session) this.post({ type: 'budgetReached', reason: event.reason, steps: event.steps });
         break;
-      case 'usage':
-        if (session === this.session) {
-          const u = event.usage;
-          this.post({
-            type: 'usage',
-            contextTokens: u.inputTokens + u.cacheReadTokens + u.cacheWriteTokens,
-            outputTokens: u.outputTokens,
-            cacheReadTokens: u.cacheReadTokens,
-            cacheWriteTokens: u.cacheWriteTokens,
-            contextWindow: this.contextWindow,
-          });
-        }
+      case 'usage': {
+        const u = event.usage;
+        const message = {
+          type: 'usage' as const,
+          contextTokens: u.inputTokens + u.cacheReadTokens + u.cacheWriteTokens,
+          outputTokens: u.outputTokens,
+          cacheReadTokens: u.cacheReadTokens,
+          cacheWriteTokens: u.cacheWriteTokens,
+          contextWindow: this.contextWindow,
+        };
+        this.lastUsage = { sessionId: session.id, message };
+        if (session === this.session) this.post(message);
         break;
+      }
     }
   }
 
-  private askApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalDecision> {
+  private askApproval(session: Session, request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalDecision> {
     const name = request.tool.name;
     const { id } = request;
+    // The host works out the rule and keeps it here, so the webview can only accept or decline it.
+    const rule =
+      name === 'run_command' ? suggestCommandRule(String((request.input as { command?: unknown } | null)?.command ?? '')) : null;
+    if (rule) {
+      this.emit(session, { type: 'toolAllowRule', id, label: describeRule(rule), usesShell: hasShellSyntax(rule.command) });
+    }
     this.pendingTools.set(id, request);
     const settle = () => {
       this.pendingTools.delete(id);
@@ -484,8 +558,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     };
     return new Promise<ApprovalDecision>((resolve) => {
       this.pendingApprovals.set(id, (decision) => {
-        // Commands are never auto-approved: each one is reviewed.
-        if (decision === 'always' && name !== 'run_command') this.alwaysAllowed.add(name);
+        if (decision === 'always') {
+          // A command is remembered as a rule for this workspace, never as "every command".
+          if (rule) void this.allowCommandRule(rule);
+          else if (name !== 'run_command') this.alwaysAllowed.add(name);
+        }
         settle();
         resolve(decision);
       });
@@ -500,6 +577,98 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         { once: true },
       );
     });
+  }
+
+  private async pickFiles(): Promise<void> {
+    const uris = await vscode.window.showOpenDialog({
+      title: 'M.I.T.R.A.M: Attach files',
+      openLabel: 'Attach',
+      canSelectMany: true,
+    });
+    if (uris?.length) await this.attachFiles(uris);
+  }
+
+  /** Files copied or dragged from a file manager. Only local files are read. */
+  private async readFiles(uris: string[]): Promise<void> {
+    const files: vscode.Uri[] = [];
+    for (const text of uris) {
+      try {
+        const uri = vscode.Uri.parse(text, true);
+        if (uri.scheme === 'file') files.push(uri);
+      } catch {
+        // Not a URI: ignore it.
+      }
+    }
+    if (files.length) await this.attachFiles(files);
+  }
+
+  /** Reads files and hands them to the webview: images to resize like a paste, other files ready to attach. */
+  private async attachFiles(uris: vscode.Uri[]): Promise<void> {
+    const results: ReadResult[] = [];
+    const limit = MAX_IMAGES + MAX_FILES;
+    if (uris.length > limit) results.push({ kind: 'error', reason: `all but the first ${limit} files` });
+    for (const uri of uris.slice(0, limit)) {
+      const name = path.basename(uri.fsPath);
+      try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if (stat.type & vscode.FileType.Directory) results.push({ kind: 'error', reason: `${name} is a folder` });
+        else if (stat.size > MAX_UPLOAD_BYTES) results.push({ kind: 'error', reason: `${name} is larger than ${MAX_UPLOAD_BYTES / 1_000_000} MB` });
+        else results.push(readAttachment(name, Buffer.from(await vscode.workspace.fs.readFile(uri))));
+      } catch {
+        results.push({ kind: 'error', reason: `${name} could not be read` });
+      }
+    }
+    this.deliverAttachments(results);
+  }
+
+  private deliverAttachments(results: ReadResult[]): void {
+    const images = results.flatMap((r) => (r.kind === 'image' ? [r.image] : []));
+    const files = results.flatMap((r) => (r.kind === 'file' ? [r.file] : []));
+    const skipped = results.flatMap((r) => (r.kind === 'error' ? [r.reason] : []));
+    if (skipped.length) void vscode.window.showWarningMessage(`M.I.T.R.A.M: Skipped ${skipped.join('; ')}.`);
+    if (images.length || files.length) this.post({ type: 'attachmentsPicked', images, files });
+  }
+
+  private async allowCommandRule(rule: CommandRule): Promise<void> {
+    await this.commandRules.add(rule);
+    this.logger.info('command rule added for this workspace');
+    const choice = await vscode.window.showInformationMessage(
+      `M.I.T.R.A.M: "${ruleLabel(rule)}" will run without asking in this workspace.`,
+      'Undo',
+      'Manage',
+    );
+    if (choice === 'Undo') await this.commandRules.remove(rule);
+    else if (choice === 'Manage') await this.manageAllowedCommands();
+  }
+
+  /** Lists this workspace's "Always allow" command rules so the user can remove some. */
+  async manageAllowedCommands(): Promise<void> {
+    const rules = this.commandRules.list();
+    if (!rules.length) {
+      const open = await vscode.window.showInformationMessage(
+        'M.I.T.R.A.M: No commands are always allowed in this workspace yet. Choose "Always allow" when a command asks for approval.',
+        'Open Settings',
+      );
+      if (open) void vscode.commands.executeCommand('workbench.action.openSettings', 'mitram.autoApproveCommands');
+      return;
+    }
+    const picked = await vscode.window.showQuickPick(
+      rules.map((rule) => ({
+        label: ruleLabel(rule),
+        description: rule.anyArgs ? 'with any arguments' : 'exactly as written',
+        rule,
+      })),
+      {
+        title: 'M.I.T.R.A.M: Commands that run without asking in this workspace',
+        placeHolder: 'Select the rules to remove, then press Enter',
+        canPickMany: true,
+      },
+    );
+    if (!picked?.length) return;
+    for (const { rule } of picked) await this.commandRules.remove(rule);
+    void vscode.window.showInformationMessage(
+      `M.I.T.R.A.M: Removed ${picked.length} rule${picked.length === 1 ? '' : 's'}. Those commands will ask again.`,
+    );
   }
 
   private async viewDiff(id: string): Promise<void> {
@@ -619,6 +788,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
 function pickEditor(editor: vscode.TextEditor | undefined): vscode.TextEditor | undefined {
   return editor && editor.document.uri.scheme === 'file' ? editor : undefined;
+}
+
+/** A saved rule on one line, short enough for a notification or a list. */
+function ruleLabel(rule: CommandRule, max = 80): string {
+  const text = describeRule(rule).replace(/\s*\r?\n\s*/g, ' ⏎ ');
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 function getNonce(): string {

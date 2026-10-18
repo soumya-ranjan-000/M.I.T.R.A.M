@@ -11,6 +11,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'undo', description: 'Revert the file changes from the last turn' },
   { name: 'plan', description: 'Toggle plan mode: investigate and propose a plan before changing anything' },
   { name: 'model', description: 'Choose the model' },
+  { name: 'permissions', description: 'Review commands that run without asking in this workspace' },
 ];
 
 const names = (c: SlashCommand) => [c.name, ...(c.aliases ?? [])];

@@ -1,15 +1,17 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { describeActivity } from '../../src/webview/activity';
 import { applyHostEvent } from '../../src/webview/displayReducer';
-import type { Board, DisplayMessage, SessionSummary } from '../../src/webview/protocol';
+import type { Board, DisplayMessage, FileAttachment, ImageAttachment, SessionSummary } from '../../src/webview/protocol';
 import { emptyBoard } from '../../src/agent/board';
 import type { SlashCommand } from '../../src/webview/slashCommands';
 import { Avatar, MessageHeader } from './components/Avatar';
 import { BoardPanel } from './components/BoardPanel';
+import { FileStrip, ImageStrip } from './components/Attachments';
 import { AgentState, Composer } from './components/Composer';
 import { Header } from './components/Header';
 import { Icon } from './components/Icon';
 import { Markdown } from './components/Markdown';
+import { PinnedRequest } from './components/PinnedRequest';
 import { ThinkingBlock } from './components/ThinkingBlock';
 import { ToolCard } from './components/ToolCard';
 import { Usage } from './components/UsageBar';
@@ -22,6 +24,9 @@ interface ErrorState {
 }
 
 const CONTINUE_TEXT = 'Continue where you left off.'; // same text the extension host uses
+const EXECUTE_PLAN_TEXT = 'The plan is approved. Please carry it out now, following the tasks on your board.';
+// Sent by the app on the user's behalf: they carry on a request rather than make one, so they are never pinned.
+const FOLLOW_UPS = new Set([CONTINUE_TEXT, EXECUTE_PLAN_TEXT]);
 
 interface Budget {
   reason: 'steps' | 'time' | 'stuck';
@@ -50,6 +55,13 @@ export function App() {
   const planTurn = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  // The user's requests on screen, by their index in `visible`, for the pinned request bar.
+  const requests = useRef(new Map<number, HTMLDivElement>());
+  const pinFrame = useRef(0);
+  // How far down the pinned bar reaches: a request starting above that line is on screen, so the
+  // bar never covers it with an older one. Measured whenever the bar is shown.
+  const pinZone = useRef(84);
+  const [pinned, setPinned] = useState<number | null>(null);
 
   useEffect(() => {
     const off = onHostMessage((msg) => {
@@ -58,6 +70,7 @@ export function App() {
         case 'thinkingDelta':
         case 'toolStart':
         case 'toolUpdate':
+        case 'toolAllowRule':
         case 'notice':
           setMessages((prev) => applyHostEvent(prev, msg));
           break;
@@ -67,6 +80,12 @@ export function App() {
           break;
         case 'board':
           setBoard(msg.board);
+          break;
+        case 'runInProgress':
+          // The view was reopened while the agent kept working: pick the run back up.
+          planTurn.current = msg.plan;
+          setBusySince(msg.since);
+          setBusy(true);
           break;
         case 'budgetReached':
           setBudget({ reason: msg.reason, steps: msg.steps });
@@ -132,14 +151,48 @@ export function App() {
     if (!el || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(() => {
       if (stickToBottom.current) el.scrollTop = el.scrollHeight;
+      updatePinned();
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
+  /**
+   * Pins the request that what is at the top of the view belongs to, once that request has scrolled
+   * fully out of sight, so a long run of tool calls never hides what was asked. Once per frame.
+   */
+  const updatePinned = useCallback(() => {
+    cancelAnimationFrame(pinFrame.current);
+    pinFrame.current = requestAnimationFrame(() => {
+      const el = scroller.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      let current = -1;
+      for (const [i, node] of requests.current) {
+        if (i > current && node.getBoundingClientRect().top < top + pinZone.current) current = i;
+      }
+      const node = requests.current.get(current);
+      setPinned(node && node.getBoundingClientRect().bottom <= top ? current : null);
+    });
+  }, []);
+
+  useEffect(updatePinned, [messages, updatePinned]);
+
   function onScroll() {
     const el = scroller.current;
     if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    updatePinned();
+  }
+
+  function jumpToRequest(index: number) {
+    const node = requests.current.get(index);
+    if (!node) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    node.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
+    node.classList.remove('flash');
+    void node.offsetWidth; // restart the animation
+    node.classList.add('flash');
+    node.addEventListener('animationend', () => node.classList.remove('flash'), { once: true });
   }
 
   const startWorking = useCallback(() => {
@@ -150,20 +203,29 @@ export function App() {
   }, []);
 
   const send = useCallback(
-    (text: string, includeActive: boolean, mentions: string[], plan: boolean) => {
+    (text: string, includeActive: boolean, mentions: string[], plan: boolean, images: ImageAttachment[] = [], files: FileAttachment[] = []) => {
       planTurn.current = plan;
       setPlanReady(false);
-      setMessages((prev) => [...prev, { role: 'user', text }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'user',
+          text,
+          ...(images.length ? { images } : {}),
+          // The transcript only shows what was attached, as the host saves it.
+          ...(files.length ? { files: files.map((f) => ({ ...f, data: '' })) } : {}),
+        },
+      ]);
       setError(null);
       startWorking();
-      postToHost({ type: 'sendMessage', text, includeActive, mentions, plan });
+      postToHost({ type: 'sendMessage', text, includeActive, mentions, plan, images, files });
     },
     [startWorking],
   );
 
   function executePlan() {
     setPlanMode(false);
-    send('The plan is approved. Please carry it out now, following the tasks on your board.', false, [], false);
+    send(EXECUTE_PLAN_TEXT, false, [], false);
   }
 
   function runSlash(command: SlashCommand) {
@@ -179,6 +241,9 @@ export function App() {
         break;
       case 'model':
         postToHost({ type: 'pickModel' });
+        break;
+      case 'permissions':
+        postToHost({ type: 'managePermissions' });
         break;
     }
   }
@@ -199,6 +264,7 @@ export function App() {
   // The plan panel shows the board, so its tool calls are not shown as cards.
   const agentState: AgentState = !busy ? 'idle' : describeActivity(messages).waitingForUser ? 'waiting' : 'working';
   const visible = messages.filter((m) => !(m.role === 'tool' && m.name === 'update_board'));
+  const pinnedMessage = pinned === null ? undefined : visible[pinned];
 
   return (
     <div className="app">
@@ -210,70 +276,98 @@ export function App() {
         </div>
       )}
 
-      <div className="messages" ref={scroller} onScroll={onScroll} role="log" aria-label="Conversation" aria-live="polite" aria-busy={busy}>
-        {messages.length === 0 && !error && (
-          <div className="welcome">
-            <Avatar role="assistant" size={40} />
-            <h2>How can I help?</h2>
-            <p>Ask about your code, or have me make changes. I ask before I edit files or run commands.</p>
-            <ul>
-              <li>
-                <kbd>@</kbd> attach a file
-              </li>
-              <li>
-                <kbd>/</kbd> commands: new, undo, plan, model
-              </li>
-              <li>
-                <kbd>Plan</kbd> investigate first, change nothing
-              </li>
-            </ul>
-          </div>
+      <div className="messages-wrap">
+        {pinnedMessage?.role === 'user' && (
+          <PinnedRequest
+            text={pinnedMessage.text}
+            images={pinnedMessage.images?.length ?? 0}
+            files={pinnedMessage.files?.length ?? 0}
+            onJump={() => jumpToRequest(pinned!)}
+            barRef={(node) => {
+              if (node) pinZone.current = node.offsetTop + node.offsetHeight;
+            }}
+          />
         )}
-
-        {visible.map((m, i) => {
-          const header = i === 0 || speaker(visible[i - 1]) !== speaker(m);
-          return (
-            <Fragment key={m.role === 'tool' ? m.id : i}>
-              {header && <MessageHeader role={speaker(m)} />}
-              {m.role === 'user' && <div className="bubble">{m.text}</div>}
-              {m.role === 'assistant' && (
-                <div className="reply">
-                  <Markdown text={m.text} />
-                </div>
-              )}
-              {m.role === 'thinking' && <ThinkingBlock text={m.text} live={busy && m === messages[messages.length - 1]} />}
-              {m.role === 'tool' && <ToolCard tool={m} />}
-            </Fragment>
-          );
-        })}
-
-        {busy && (
-          <>
-            {messages.length > 0 && speaker(messages[messages.length - 1]) === 'user' && <MessageHeader role="assistant" />}
-            <WorkingStatus messages={messages} since={busySince} />
-          </>
-        )}
-
-        {error && (
-          <div className="error-box" role="alert">
-            <div>{error.message}</div>
-            <div className="actions">
-              {error.needsSetup ? (
-                <>
-                  <button onClick={() => postToHost({ type: 'setApiKey' })}>
-                    <Icon name="key" /> Set API key
-                  </button>
-                  <button onClick={() => postToHost({ type: 'openSettings' })}>
-                    <Icon name="settings" /> Settings
-                  </button>
-                </>
-              ) : null}
-              <button onClick={retry}>
-                <Icon name="retry" /> Retry
-              </button>
+        <div className="messages" ref={scroller} onScroll={onScroll} role="log" aria-label="Conversation" aria-live="polite" aria-busy={busy}>
+          {messages.length === 0 && !error && (
+            <div className="welcome">
+              <Avatar role="assistant" size={40} />
+              <h2>How can I help?</h2>
+              <p>Ask about your code, or have me make changes. I ask before I edit files or run commands.</p>
+              <ul>
+                <li>
+                  <kbd>@</kbd> attach a file
+                </li>
+                <li>
+                  <kbd>+</kbd> attach images, PDFs and documents, or paste a screenshot
+                </li>
+                <li>
+                  <kbd>/</kbd> commands: new, undo, plan, model
+                </li>
+                <li>
+                  <kbd>Plan</kbd> investigate first, change nothing
+                </li>
+              </ul>
             </div>
-          </div>
-        )}
+          )}
+
+          {visible.map((m, i) => {
+            const header = i === 0 || speaker(visible[i - 1]) !== speaker(m);
+            return (
+              <Fragment key={m.role === 'tool' ? m.id : i}>
+                {header && <MessageHeader role={speaker(m)} />}
+                {m.role === 'user' && (
+                  <div
+                    className="bubble"
+                    ref={(node) => {
+                      if (node && !FOLLOW_UPS.has(m.text)) requests.current.set(i, node);
+                      else requests.current.delete(i);
+                    }}
+                  >
+                    {m.images?.length ? <ImageStrip images={m.images} /> : null}
+                  {m.files?.length ? <FileStrip files={m.files} /> : null}
+                    {m.text}
+                  </div>
+                )}
+                {m.role === 'assistant' && (
+                  <div className="reply">
+                    <Markdown text={m.text} />
+                  </div>
+                )}
+                {m.role === 'thinking' && <ThinkingBlock text={m.text} live={busy && m === messages[messages.length - 1]} />}
+                {m.role === 'tool' && <ToolCard tool={m} />}
+              </Fragment>
+            );
+          })}
+
+          {busy && (
+            <>
+              {messages.length > 0 && speaker(messages[messages.length - 1]) === 'user' && <MessageHeader role="assistant" />}
+              <WorkingStatus messages={messages} since={busySince} />
+            </>
+          )}
+
+          {error && (
+            <div className="error-box" role="alert">
+              <div>{error.message}</div>
+              <div className="actions">
+                {error.needsSetup ? (
+                  <>
+                    <button onClick={() => postToHost({ type: 'setApiKey' })}>
+                      <Icon name="key" /> Set API key
+                    </button>
+                    <button onClick={() => postToHost({ type: 'openSettings' })}>
+                      <Icon name="settings" /> Settings
+                    </button>
+                  </>
+                ) : null}
+                <button onClick={retry}>
+                  <Icon name="retry" /> Retry
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {budget && !busy && (
@@ -321,7 +415,7 @@ export function App() {
         usage={usage}
         onTogglePlan={() => setPlanMode((v) => !v)}
         onSlash={runSlash}
-        onSend={(text, includeActive, mentions) => send(text, includeActive, mentions, planMode)}
+        onSend={(text, includeActive, mentions, images, files) => send(text, includeActive, mentions, planMode, images, files)}
       />
     </div>
   );

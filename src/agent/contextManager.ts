@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../providers/ModelProvider';
+import { dropAttachments, estimateAttachmentTokens } from './attachments';
 
 /** Conservative for source code, so we trim slightly early rather than overflow. */
 const CHARS_PER_TOKEN = 3.5;
@@ -34,6 +35,10 @@ function blockChars(block: Block): number {
       if (typeof c === 'string') return c.length;
       return Array.isArray(c) ? c.reduce((n: number, b: Block) => n + blockChars(b), 0) : 0;
     }
+    case 'image':
+    case 'document':
+      // Not the base64 length: an image costs about w*h/750 tokens and a PDF a few thousand per page.
+      return estimateAttachmentTokens(block) * CHARS_PER_TOKEN;
     default:
       return JSON.stringify(block).length;
   }
@@ -72,6 +77,8 @@ export interface ManageResult {
   after: number;
   clearedToolResults: number;
   removedContexts: number;
+  /** Images and PDFs taken out of older turns. */
+  removedAttachments: number;
   droppedMessages: number;
   /** True if the dropped turns were replaced by a model-written summary. */
   summarized: boolean;
@@ -92,7 +99,7 @@ function thresholds(options: ManageOptions) {
   };
 }
 
-/** Level 1: clear bulky old tool output and old attached context, oldest first. Edits `history` in place. */
+/** Level 1: clear bulky old tool output, old attached context, images and PDFs, oldest first. Edits `history` in place. */
 function clearBulky(history: ChatMessage[], options: ManageOptions, before: number, result: ManageResult): number {
   const { target } = thresholds(options);
   const keepRecent = options.keepRecentToolResults ?? 4;
@@ -143,6 +150,7 @@ function clearBulky(history: ChatMessage[], options: ManageOptions, before: numb
             result.removedContexts++;
           }
         }
+        result.removedAttachments += dropAttachments(message, 'trimmed');
       }
     }
     current += estimateMessageTokens(message) - sizeBefore;
@@ -163,19 +171,28 @@ function dropOldestTurns(history: ChatMessage[], options: ManageOptions, result:
 }
 
 function newResult(before: number): ManageResult {
-  return { changed: false, before, after: before, clearedToolResults: 0, removedContexts: 0, droppedMessages: 0, summarized: false };
+  return {
+    changed: false,
+    before,
+    after: before,
+    clearedToolResults: 0,
+    removedContexts: 0,
+    removedAttachments: 0,
+    droppedMessages: 0,
+    summarized: false,
+  };
 }
 
 function finish(history: ChatMessage[], options: ManageOptions, result: ManageResult): ManageResult {
   result.after = totalTokens(history, options.fixedTokens);
-  result.changed = result.clearedToolResults + result.removedContexts + result.droppedMessages > 0;
+  result.changed = result.clearedToolResults + result.removedContexts + result.removedAttachments + result.droppedMessages > 0;
   return result;
 }
 
 /**
  * Keeps the conversation inside the context window by editing `history` in place.
  *
- * 1. Clears bulky old tool output and old attached file context, oldest first.
+ * 1. Clears bulky old tool output, old attached file context, images and PDFs, oldest first.
  * 2. If that is not enough, drops the oldest whole turns (never the current one).
  *
  * Trimming happens in bursts (trigger 70%, target 50%) and is written back to the

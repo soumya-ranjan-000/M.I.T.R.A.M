@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   CLEARED_TOOL_OUTPUT, REMOVED_CONTEXT, REMOVED_TURNS, SUMMARY_PREFIX, estimateMessageTokens, manageContext, manageContextAsync,
 } from '../src/agent/contextManager';
+import { REMOVED_IMAGE } from '../src/agent/attachments';
 import type { ChatMessage } from '../src/providers/ModelProvider';
+import { fakeImage } from './imageFixtures';
 
 const big = (n: number) => 'x'.repeat(n);
 
@@ -204,5 +206,44 @@ describe('manageContextAsync (summaries)', () => {
     const r = await manageContextAsync(h, opts);
     expect(r.droppedMessages).toBeGreaterThan(0);
     expect(r.summarized).toBe(false);
+  });
+});
+
+describe('images in the context', () => {
+  // A 1000×750 screenshot padded to about 1.3 MB of base64.
+  const withImage = (text: string): ChatMessage => ({
+    role: 'user',
+    content: [
+      { type: 'image', source: { type: 'base64', media_type: 'image/png', data: fakeImage(1000, 750, 1_000_000) } },
+      { type: 'text', text },
+    ],
+  });
+  const types = (m: ChatMessage) => (m.content as { type: string }[]).map((b) => b.type);
+
+  it('counts an image by its pixels, not by the size of its base64', () => {
+    const tokens = estimateMessageTokens(withImage('hi'));
+    expect(tokens).toBeGreaterThanOrEqual(1000);
+    expect(tokens).toBeLessThan(1100);
+  });
+
+  it('does not trim a short chat just because it has a screenshot', () => {
+    const history = [withImage('what is this?')];
+    expect(manageContext(history, opts).changed).toBe(false);
+    expect(types(history[0])).toEqual(['image', 'text']);
+  });
+
+  it('removes images from older turns when trimming, but keeps the current turn’s', () => {
+    const history: ChatMessage[] = [withImage('old question'), { role: 'assistant', content: 'old answer' }];
+    for (let i = 0; i < 14; i++) history.push(...turn(i));
+    history.push(withImage('current question'));
+    const result = manageContext(history, opts);
+    expect(result.removedAttachments).toBe(1);
+    expect(result.changed).toBe(true);
+    expect(history[0].content).toEqual([
+      { type: 'text', text: REMOVED_IMAGE },
+      { type: 'text', text: 'old question' },
+    ]);
+    expect(types(history[history.length - 1])).toEqual(['image', 'text']);
+    assertValid(history);
   });
 });

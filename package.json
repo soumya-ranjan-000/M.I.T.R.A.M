@@ -2,14 +2,13 @@
   "name": "mitram",
   "displayName": "M.I.T.R.A.M",
   "description": "A standalone AI coding agent with chat and tool use.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/soumya-ranjan-000/M.I.T.R.A.M.git"
   },
   "publisher": "mitram",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/soumya-ranjan-000/M.I.T.R.A.M.git" },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -49,6 +48,10 @@
         "title": "M.I.T.R.A.M: New Chat"
       },
       {
+        "command": "mitram.manageAllowedCommands",
+        "title": "M.I.T.R.A.M: Manage Always-Allowed Commands"
+      },
+      {
         "command": "mitram.setApiKey",
         "title": "M.I.T.R.A.M: Set API Key"
       },
@@ -73,9 +76,10 @@
       "title": "M.I.T.R.A.M",
       "properties": {
         "mitram.endpoint": {
+          "scope": "application",
           "type": "string",
           "default": "",
-          "description": "Azure AI Foundry endpoint for Claude, e.g. https://<resource>.services.ai.azure.com/anthropic/"
+          "description": "Azure AI Foundry endpoint for Claude, e.g. https://<resource>.services.ai.azure.com/anthropic/. Read from user settings only, so a repository cannot send your API key elsewhere."
         },
         "mitram.model": {
           "type": "string",
@@ -93,11 +97,13 @@
           "description": "Maximum model/tool steps for one message. When reached, the agent pauses and offers a Continue button."
         },
         "mitram.autoApproveEdits": {
+          "scope": "application",
           "type": "boolean",
           "default": false,
           "markdownDescription": "Apply `edit_file` and `create_file` without asking. Use **Revert changes** to undo a turn. Off by default."
         },
         "mitram.autoApproveSafeCommands": {
+          "scope": "application",
           "type": "boolean",
           "default": false,
           "markdownDescription": "Run a tiny set of read-only commands (`pwd`, `ls`, `git status/diff/log/show`) without asking. Every other command always asks. Off by default."
@@ -126,12 +132,13 @@
           "description": "Send open tabs, the git branch and diff summary, and current errors with each message."
         },
         "mitram.autoApproveCommands": {
+          "scope": "application",
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
-          "markdownDescription": "Commands that run without asking. Each entry is a regular expression that must match the **whole** command, e.g. `npm test`, `python3? hello\\\\.py` or `npm run (lint|build)`. Commands containing `;`, `&`, `|`, `>`, `<`, backticks or `$(` always ask, and blocked commands stay blocked."
+          "markdownDescription": "Commands that run without asking in every workspace. Each entry is a regular expression that must match the **whole** command, e.g. `npm test`, `python3? hello\\\\.py` or `npm run (lint|build)`. Commands containing `;`, `&`, `|`, `>`, `<`, backticks or `$(` always ask, and blocked commands stay blocked. For one project, choose **Always allow** on a command's approval card instead, and review those with `/permissions`. Only user settings count here, so a repository cannot set this."
         },
         "mitram.models": {
           "type": "array",

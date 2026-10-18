@@ -1,10 +1,12 @@
-import { hasShellSyntax, isSafeReadOnlyCommand } from './commandPolicy';
+import { CommandRule, hasShellSyntax, isSafeReadOnlyCommand, matchesRule } from './commandPolicy';
 
 export interface ApprovalSettings {
   autoApproveEdits: boolean;
   autoApproveSafeCommands: boolean;
   /** Commands matching one of these (as a whole) run without asking. */
   autoApproveCommands: RegExp[];
+  /** Rules saved with "Always allow" for this workspace. */
+  allowedCommands: CommandRule[];
 }
 
 /**
@@ -23,8 +25,11 @@ export function isAutoApproved(
 
   if (toolName === 'run_command') {
     const command = String((input as { command?: unknown } | null)?.command ?? '').trim();
-    // Anything with shell syntax (chaining, pipes, redirects, substitution) is always reviewed.
-    if (!command || hasShellSyntax(command)) return false;
+    if (!command) return false;
+    // An exact rule may cover shell syntax: it is the very command the user reviewed.
+    if (settings.allowedCommands.some((rule) => matchesRule(rule, command))) return true;
+    // Otherwise anything with shell syntax (chaining, pipes, redirects, substitution) is always reviewed.
+    if (hasShellSyntax(command)) return false;
     if (settings.autoApproveSafeCommands && isSafeReadOnlyCommand(command)) return true;
     return settings.autoApproveCommands.some((pattern) => pattern.test(command));
   }

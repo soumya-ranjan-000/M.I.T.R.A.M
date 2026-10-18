@@ -1,5 +1,12 @@
 const PATHS = {
   plus: <path d="M12 5v14M5 12h14" />,
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-5-5L5 21" />
+    </>
+  ),
   trash: <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />,
   send: <path d="M12 19V5M5 12l7-7 7 7" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />,

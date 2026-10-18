@@ -120,6 +120,24 @@ describe('edit_file / create_file', () => {
 });
 
 describe('run_command', () => {
+  const preview = (command: unknown) => registry.get('run_command')!.preview({ command });
+
+  it('shows a short command on one line only', () => {
+    expect(preview('npm test')).toEqual({ summary: 'Run: npm test', detail: undefined });
+  });
+
+  it('shows the whole of a long or multi-line command, so it can be read before approving', () => {
+    const long = 'npx vitest run test/tools.test.ts --reporter=verbose';
+    expect(preview(long)).toEqual({ summary: `Run: ${long}`, detail: long });
+
+    const script = "cat > /tmp/t.js <<'EOF'\nconst fs = require('fs');\nEOF\nnode /tmp/t.js";
+    expect(preview(script)).toEqual({ summary: "Run: cat > /tmp/t.js <<'EOF' …", detail: script });
+  });
+
+  it('previews malformed input without throwing', () => {
+    expect(registry.get('run_command')!.preview(null).summary).toBe('Run: ');
+  });
+
   it('captures output and exit code in the workspace root', async () => {
     const out = await run('run_command', { command: 'echo hi && pwd' });
     expect(out).toContain('exit code 0');

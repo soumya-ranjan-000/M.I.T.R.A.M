@@ -74,9 +74,13 @@ export function ToolCard({ tool }: { tool: ToolMessage }) {
       )}
 
       {pending && tool.detail && <pre className="toolcard-body">{tool.detail}</pre>}
-      {pending && tool.name === 'run_command' && (
-        <p className="toolcard-hint">
-          Commands always ask first. To skip this for specific ones, add them to the <code>mitram.autoApproveCommands</code> setting.
+      {pending && tool.allowRule?.usesShell && (
+        <p className="toolcard-warning">
+          <Icon name="alert" size={13} />
+          <span>
+            This command uses pipes, chaining, redirects or wildcards, so it can do several things at once. Always allow
+            covers only this exact command, so read all of it first.
+          </span>
         </p>
       )}
       {pending && (
@@ -91,9 +95,26 @@ export function ToolCard({ tool }: { tool: ToolMessage }) {
           </button>
           {tool.name !== 'run_command' && (
             <button onClick={() => decide('always')} title="Allow this kind of action for the rest of this chat">
-              Always allow
+              Always allow in this chat
             </button>
           )}
+          {tool.allowRule &&
+            (tool.allowRule.usesShell ? (
+              <button
+                onClick={() => decide('always')}
+                title="Run exactly this command without asking in this workspace. Any change to it, even one character, asks again. Review saved commands with /permissions."
+              >
+                Always allow this exact command
+              </button>
+            ) : (
+              <button
+                className="always-rule"
+                onClick={() => decide('always')}
+                title={`Run commands matching "${tool.allowRule.label}" without asking in this workspace (* means any further arguments). Review them with /permissions.`}
+              >
+                Always allow <code>{tool.allowRule.label}</code>
+              </button>
+            ))}
           <button onClick={() => decide('reject')}>
             <Icon name="x" /> Reject
           </button>

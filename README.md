@@ -7,7 +7,7 @@ It talks to **Claude on Azure AI Foundry** using your own endpoint and API key. 
 ## Getting started
 
 1. Install the extension and open a **folder** (the agent needs one to work on files).
-2. Open **Settings** and set `mitram.endpoint` to your Foundry endpoint, for example `https://<resource>.services.ai.azure.com/anthropic/`.
+2. Open your user **Settings** and set `mitram.endpoint` to your Foundry endpoint, for example `https://<resource>.services.ai.azure.com/anthropic/`.
 3. Set `mitram.model` to your **deployment name**.
 4. Run **M.I.T.R.A.M: Set API Key** from the Command Palette.
 5. Click the M.I.T.R.A.M icon in the activity bar (or press `Ctrl+Alt+M` / `Cmd+Alt+M`) and ask for something, such as *"add a unit test for the slugify function and run it"*.
@@ -22,12 +22,21 @@ It talks to **Claude on Azure AI Foundry** using your own endpoint and API key. 
 | Plan first | Turn on **Plan** (or type `/plan`) and it only investigates, then proposes a plan you approve |
 | Keep track | A **plan board** with task statuses that it updates as it works, so it always knows what is done and what is left |
 
-In the message box: type `@` to attach a file, `/` for commands (`/new`, `/undo`, `/plan`, `/model`). The current file or selection is attached automatically; untick the chip above the box to stop that.
+In the message box: type `@` to attach a file, `/` for commands (`/new`, `/undo`, `/plan`, `/model`, `/permissions`). The current file or selection is attached automatically; untick the chip above the box to stop that.
+
+To show it something, paste a screenshot (**Ctrl+V**), drop files on the box (hold **Shift** while dropping, as VS Code requires), or use **+** → **Attach files…**. Up to 5 images and 5 other files per message:
+
+- **Images** are scaled to what the model can read (2576 px on the long edge, 3.75 megapixels), and re-encoding drops metadata such as a photo's location.
+- **PDFs** (up to 15 MB) go to the model as they are, so it sees the pages, including tables and charts.
+- **Word, Excel, PowerPoint and LibreOffice files** are sent as the text read from them: documents as paragraphs, spreadsheets as CSV for each sheet (with real dates), presentations slide by slide. Old `.doc`, `.xls` and `.ppt` files need saving in the newer format first.
+- **Text files** of any kind (code, CSV, JSON, Markdown, logs) are sent as they are, up to about 200,000 characters each.
+
+File types are recognised from their contents, not their names.
 
 ## Feature tour
 
 ### A chat that works on your project
-Ask about your code or ask for a change. The current file is attached automatically, and the model's reasoning is shown while it works.
+Ask about your code or ask for a change. The current file is attached automatically, and the model's reasoning is shown while it works. When a long run of tool calls scrolls your message out of view, it stays pinned at the top of the chat (the request for whatever part you are reading); click it to jump back to the full message.
 
 <p align="center"><img src="media/screenshots/01-welcome.png" alt="The welcome screen of the chat panel" width="360"></p>
 
@@ -38,6 +47,8 @@ The agent searches and reads your files (and your editor's error list) before it
 
 ### You approve every change
 Edits and commands wait for you. **View diff** opens VS Code's diff editor on the exact change, and **Allow**, **Always allow** or **Reject** decide what happens next.
+
+**Always allow** on a command saves a rule for this workspace, shown on the button before you click it: `npm run lint *` (the script with any arguments) for everyday tools, or just the exact command for interpreters, installs and anything that deletes, pushes or reaches the network. A command with pipes, chaining, redirects or wildcards is saved only exactly as written, character for character, and the card warns you to read all of it first. Type `/permissions` to review or remove saved rules.
 
 <p align="center"><img src="media/screenshots/03-approval.png" alt="An edit waiting for approval with View diff, Allow, Always allow and Reject" width="360"></p>
 
@@ -89,13 +100,14 @@ Things that keep a long run on track:
 - **Blocked outright.** Obviously destructive commands (`sudo`, `rm -rf /`, `curl … | sh`, force-push, and similar) are refused without asking. You can add your own patterns with `mitram.blockedCommandPatterns`. This is a safety net, not a sandbox: the approval prompt is your real protection.
 - **Revert.** After a turn that changed files, **Revert changes** restores them. A file you edited yourself afterwards is left alone. Changes made by commands the agent ran are not tracked.
 - **Workspace only.** File tools cannot read or write outside the open folder, including through symlinks.
-- **Optional auto-approve**, all off by default: `mitram.autoApproveEdits`, `mitram.autoApproveSafeCommands` (`pwd`, `ls`, read-only `git`) and `mitram.autoApproveCommands` (a list of commands you trust, each matched as a whole; anything chained with `;`, `&`, `|` or redirects always asks).
+- **Optional auto-approve**, all off by default: `mitram.autoApproveEdits`, `mitram.autoApproveSafeCommands` (`pwd`, `ls`, read-only `git`) and `mitram.autoApproveCommands` (a list of commands you trust in every workspace, each matched as a whole; anything chained with `;`, `&`, `|` or redirects always asks). These are read from your user settings only, so a repository's `.vscode/settings.json` cannot switch them on.
+- **Per-project command rules.** **Always allow** on a command card saves a rule in VS Code's storage for this workspace, not in a file a repository could ship. Review them with `/permissions` or **M.I.T.R.A.M: Manage Always-Allowed Commands**.
 
 ## Settings
 
 | Setting | What it does |
 |---|---|
-| `mitram.endpoint` | Your Azure AI Foundry endpoint |
+| `mitram.endpoint` | Your Azure AI Foundry endpoint (user settings only) |
 | `mitram.model` / `mitram.models` | Default model (deployment name) and extra names for the picker |
 | `mitram.maxTokens` | Maximum tokens per reply |
 | `mitram.maxIterations` / `mitram.maxRunMinutes` | Pause a run after this many steps (default 60) or minutes (default 20); a Continue button resumes it |
@@ -114,9 +126,9 @@ Run **M.I.T.R.A.M: Create Project Instructions (MITRAM.md)** to create a `MITRAM
 ## Privacy
 
 - **No telemetry.** This extension does not collect or send usage data.
-- **Where your data goes.** The only network traffic is to the endpoint you configure. Each request contains your message, files and selections you attach, the results of tools the agent ran (file contents, command output), the agent's plan board, and, unless you turn it off, the environment summary described above. When a long conversation is summarised, the earlier part of it is sent to the same endpoint to be summarised.
+- **Where your data goes.** The only network traffic is to the endpoint you configure. It is read from your user settings only, so a repository's `.vscode/settings.json` cannot redirect your requests or API key. Each request contains your message, files, selections and images you attach, the results of tools the agent ran (file contents, command output), the agent's plan board, and, unless you turn it off, the environment summary described above. When a long conversation is summarised, the earlier part of it is sent to the same endpoint to be summarised.
 - **Your API key** is kept in VS Code's secret storage and is never written to settings, logs or chat history.
-- **Chats** are stored locally in VS Code's extension storage on your machine.
+- **Chats** are stored locally in VS Code's extension storage on your machine. To keep that small, saved chats keep the images and PDFs of only their last two messages with them, in your three most recent chats; older images show as "image (not kept)". Text read from attached files is kept like any other attached context.
 - **Logs** (`M.I.T.R.A.M: Show Logs`) are local, contain no prompts, file contents or command output, and have anything resembling a credential redacted. **Copy Diagnostics for Bug Report** includes only versions, settings and the endpoint's host name.
 
 ## Troubleshooting

@@ -20,6 +20,14 @@ describe('applyHostEvent', () => {
     expect(m[0]).toMatchObject({ role: 'tool', status: 'ok', output: 'done' });
   });
 
+  it('attaches the suggested "Always allow" rule to a pending command card', () => {
+    let m = applyHostEvent([], { type: 'toolStart', id: 't', name: 'run_command', summary: 'Run', status: 'pending' });
+    m = applyHostEvent(m, { type: 'toolAllowRule', id: 't', label: 'npm test *', usesShell: false });
+    m = applyHostEvent(m, { type: 'toolAllowRule', id: 'other', label: 'rm x', usesShell: false });
+    expect(m).toHaveLength(1);
+    expect(m[0]).toMatchObject({ role: 'tool', status: 'pending', allowRule: { label: 'npm test *', usesShell: false } });
+  });
+
   it('groups streamed reasoning into one block, and starts a new answer after it', () => {
     let m: DisplayMessage[] = [{ role: 'user', text: 'hi' }];
     m = applyHostEvent(m, { type: 'thinkingDelta', text: 'Look ' });

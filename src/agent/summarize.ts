@@ -28,6 +28,10 @@ export function renderTranscript(messages: ChatMessage[]): string {
     for (const block of m.content as unknown as { type: string; [k: string]: unknown }[]) {
       if (block.type === 'text') {
         lines.push(`${who}: ${String(block.text).replace(CONTEXT_RE, '').trim()}`);
+      } else if (block.type === 'image') {
+        lines.push(`${who}: [attached an image]`);
+      } else if (block.type === 'document') {
+        lines.push(`${who}: [attached a PDF${typeof block.title === 'string' ? ` "${block.title}"` : ''}]`);
       } else if (block.type === 'tool_use') {
         lines.push(`Assistant called ${String(block.name)} with ${clip(JSON.stringify(block.input ?? {}), 200)}`);
       } else if (block.type === 'tool_result') {

@@ -3,7 +3,7 @@ import { parseSlash, suggestSlash } from '../src/webview/slashCommands';
 
 describe('suggestSlash', () => {
   it('lists every command for a bare slash', () => {
-    expect(suggestSlash('/').map((c) => c.name)).toEqual(['new', 'undo', 'plan', 'model']);
+    expect(suggestSlash('/').map((c) => c.name)).toEqual(['new', 'undo', 'plan', 'model', 'permissions']);
   });
   it('filters by prefix, including aliases and case', () => {
     expect(suggestSlash('/pl').map((c) => c.name)).toEqual(['plan']);
