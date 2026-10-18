@@ -3,6 +3,10 @@
   "displayName": "M.I.T.R.A.M",
   "description": "A standalone AI coding agent with chat and tool use.",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/soumya-ranjan-000/M.I.T.R.A.M.git"
+  },
   "publisher": "mitram",
   "engines": {
     "vscode": "^1.90.0"
