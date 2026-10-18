@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { INSTRUCTIONS_FILE, INSTRUCTIONS_TEMPLATE } from './agent/projectInstructions';
 import { Logger, buildDiagnostics } from './logging';
@@ -9,7 +10,9 @@ import { ProposalContentProvider } from './webview/ProposalContentProvider';
 
 export function activate(context: vscode.ExtensionContext): void {
   const secrets = new SecretStore(context.secrets);
-  const sessions = new SessionStore(context.globalStorageUri.fsPath);
+  // Chats belong to a project: storageUri is unique per workspace, so two windows never share history.
+  // With no folder open there is no storageUri, so those chats get their own bucket.
+  const sessions = new SessionStore(context.storageUri?.fsPath ?? path.join(context.globalStorageUri.fsPath, 'no-workspace'));
   const output = vscode.window.createOutputChannel('M.I.T.R.A.M', { log: true });
   const logger = new Logger(output);
   const proposals = new ProposalContentProvider();
