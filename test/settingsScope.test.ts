@@ -6,9 +6,21 @@ const manifest = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 
 const properties: Record<string, { scope?: string }> = manifest.contributes.configuration.properties;
 
 describe('security-sensitive settings', () => {
-  // A cloned repository's .vscode/settings.json must not be able to redirect the API key or skip approvals.
-  it.each(['mitram.endpoint', 'mitram.skipApprovalPrompts', 'mitram.autoApproveEdits', 'mitram.autoApproveSafeCommands', 'mitram.autoApproveCommands'])(
-    '%s is read from user settings only',
-    (key) => expect(properties[key]?.scope).toBe('application'),
-  );
+  // A cloned repository's .vscode/settings.json must not be able to redirect the API key, skip
+  // approvals, or make M.I.T.R.A.M start a process of its choosing.
+  it.each([
+    'mitram.endpoint',
+    'mitram.skipApprovalPrompts',
+    'mitram.autoApproveEdits',
+    'mitram.autoApproveSafeCommands',
+    'mitram.autoApproveCommands',
+    'mitram.mcpServers',
+    'mitram.autoApproveMcpReads',
+  ])('%s is read from user settings only', (key) => expect(properties[key]?.scope).toBe('application'));
+
+  // The key itself belongs in SecretStorage, so the schema must not invite one into settings.json.
+  it('mitram.mcpServers has no field for an API key', () => {
+    const schema = JSON.stringify(properties['mitram.mcpServers']);
+    expect(schema).not.toMatch(/"(apiKey|key|token|secret|password)"\s*:/i);
+  });
 });

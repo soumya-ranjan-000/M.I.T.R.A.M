@@ -1,4 +1,22 @@
-import type { DisplayMessage, HostToWebview } from './protocol';
+import type { DisplayMessage, HostToWebview, ToolCall } from './protocol';
+
+type ToolMessage = Extract<DisplayMessage, { role: 'tool' }>;
+
+/** Changes the top-level tool card with this id. */
+function updateTool(messages: DisplayMessage[], id: string, change: (m: ToolMessage) => ToolMessage): DisplayMessage[] {
+  return messages.map((m) => (m.role === 'tool' && m.id === id ? change(m) : m));
+}
+
+/** Changes a tool call made by a sub-agent: its own card or, without a parent, a top-level one. */
+function updateCall(
+  messages: DisplayMessage[],
+  id: string,
+  parentId: string | undefined,
+  change: <T extends ToolCall>(c: T) => T,
+): DisplayMessage[] {
+  if (!parentId) return updateTool(messages, id, change);
+  return updateTool(messages, parentId, (m) => ({ ...m, steps: m.steps?.map((s) => (s.id === id ? change(s) : s)) }));
+}
 
 /**
  * Applies a host event to the visible message list. Shared by the extension host
@@ -20,28 +38,17 @@ export function applyHostEvent(messages: DisplayMessage[], event: HostToWebview)
       }
       return [...messages, { role: 'thinking', text: event.text }];
     }
-    case 'toolStart':
-      return [
-        ...messages,
-        {
-          role: 'tool',
-          id: event.id,
-          name: event.name,
-          summary: event.summary,
-          detail: event.detail,
-          status: event.status,
-        },
-      ];
+    case 'toolStart': {
+      const call: ToolCall = { id: event.id, name: event.name, summary: event.summary, detail: event.detail, status: event.status };
+      if (event.parentId) return updateTool(messages, event.parentId, (m) => ({ ...m, steps: [...(m.steps ?? []), call] }));
+      return [...messages, { role: 'tool', ...call, ...(event.badge ? { badge: event.badge } : {}) }];
+    }
     case 'toolUpdate':
-      return messages.map((m) =>
-        m.role === 'tool' && m.id === event.id
-          ? { ...m, status: event.status, output: event.output ?? m.output }
-          : m,
-      );
+      return updateCall(messages, event.id, event.parentId, (c) => ({ ...c, status: event.status, output: event.output ?? c.output }));
     case 'toolAllowRule':
-      return messages.map((m) =>
-        m.role === 'tool' && m.id === event.id ? { ...m, allowRule: { label: event.label, usesShell: event.usesShell } } : m,
-      );
+      return updateCall(messages, event.id, event.parentId, (c) => ({ ...c, allowRule: { label: event.label, usesShell: event.usesShell } }));
+    case 'toolNote':
+      return updateTool(messages, event.id, (m) => ({ ...m, note: event.note || undefined }));
     case 'notice':
       return [...messages, { role: 'assistant', text: `_${event.text}_` }];
     case 'retrieved':

@@ -2,7 +2,7 @@
   "name": "mitram",
   "displayName": "M.I.T.R.A.M",
   "description": "A standalone AI coding agent with chat and tool use.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/soumya-ranjan-000/M.I.T.R.A.M.git"
@@ -178,6 +178,118 @@
           "type": "boolean",
           "default": true,
           "description": "When a long conversation nears the context limit, replace the oldest part with a short model-written summary instead of dropping it. Uses one extra model request."
+        },
+        "mitram.subagents": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Let the agent hand self-contained tasks to sub-agents that work in parallel, each with its own context, and report back. Sub-agents follow the same approval settings and safety rules, and in plan mode they can only read."
+        },
+        "mitram.maxParallelSubagents": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 8,
+          "markdownDescription": "How many sub-agents may work at the same time; more wait their turn. Each one makes its own model requests, so a higher number finishes sooner but uses your deployment's rate limit faster."
+        },
+        "mitram.mcpServers": {
+          "scope": "application",
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "Local server: the executable to run, e.g. \"npx\"."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Arguments for the command."
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Environment variables for the server process. Use ${env:NAME} to take a value from your own environment."
+              },
+              "url": {
+                "type": "string",
+                "description": "Remote server endpoint. Must use https, unless it points at localhost."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Extra HTTP headers for a remote server."
+              },
+              "transport": {
+                "type": "string",
+                "enum": [
+                  "stdio",
+                  "http",
+                  "sse"
+                ],
+                "description": "Usually inferred: \"stdio\" for a command, \"sse\" for a URL ending in /sse, \"http\" otherwise."
+              },
+              "auth": {
+                "type": "object",
+                "description": "How this server's API key is sent. The key itself is kept in VS Code's secret storage, never here.",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "header",
+                      "env"
+                    ],
+                    "description": "Send the key as an HTTP header (remote) or an environment variable (local)."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The header or variable name, e.g. \"Authorization\" or \"GITHUB_TOKEN\"."
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "Template for the value, with {key} standing for the secret, e.g. \"Bearer {key}\"."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Turn this server off without removing it."
+              }
+            }
+          },
+          "markdownDescription": "MCP servers whose tools the agent may use, as a map of name to settings. Manage these from the **MCP servers** panel in the chat view, or edit them here. API keys are stored in VS Code's secret storage, never in this file. Read from user settings only, so a repository cannot make M.I.T.R.A.M start a process."
+        },
+        "mitram.blockedMcpTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Regular expressions matched against full MCP tool names (`mcp__<server>__<tool>`). A matching tool is blocked without asking, e.g. `mcp__.*__delete_.*`."
+        },
+        "mitram.autoApproveMcpReads": {
+          "scope": "application",
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run MCP tools the server marks as read-only without asking. The hint comes from the server itself, so leave this off unless you trust every server you have configured. Off by default."
+        },
+        "mitram.mcpToolLimit": {
+          "type": "number",
+          "default": 60,
+          "minimum": 1,
+          "maximum": 200,
+          "markdownDescription": "Largest number of MCP tools offered to the model at once. Tool definitions cost tokens on every request, so extra tools beyond this are dropped and listed in the log."
         }
       }
     },
@@ -202,6 +314,8 @@
     "eval": "npm run eval:build && node dist/evals.js",
     "bench:retrieval": "esbuild test/retrieval/bench.ts --bundle --platform=node --target=node20 --outfile=dist/retrieval-bench.js --log-level=warning && node --expose-gc dist/retrieval-bench.js",
     "test:coverage": "vitest run --coverage",
+    "smoke:mcp": "esbuild scripts/mcp-smoke.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/mcp-smoke.js --log-level=warning && node dist/mcp-smoke.js",
+    "smoke:mcp:playwright": "esbuild scripts/mcp-smoke-playwright.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/mcp-smoke-playwright.js --log-level=warning && node dist/mcp-smoke-playwright.js",
     "build:prod": "node esbuild.js --production && npm --prefix webview-ui run build",
     "vscode:prepublish": "npm run build:prod",
     "package": "vsce package --no-dependencies",

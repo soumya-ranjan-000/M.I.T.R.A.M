@@ -1,3 +1,4 @@
+import { isMcpToolName } from '../mcp/naming';
 import { CommandRule, hasShellSyntax, isSafeReadOnlyCommand, matchesRule } from './commandPolicy';
 
 export interface ApprovalSettings {
@@ -8,6 +9,10 @@ export interface ApprovalSettings {
   autoApproveCommands: RegExp[];
   /** Rules saved with "Always allow" for this workspace. */
   allowedCommands: CommandRule[];
+  /** Run MCP tools the server itself marks read-only without asking. Off by default. */
+  autoApproveMcpReads?: boolean;
+  /** Full names of MCP tools whose server claims they change nothing. */
+  mcpReadOnlyTools?: ReadonlySet<string>;
 }
 
 /**
@@ -21,6 +26,13 @@ export function isAutoApproved(
   alwaysAllowed: ReadonlySet<string>,
 ): boolean {
   if (alwaysAllowed.has(toolName)) return true;
+
+  // An MCP tool runs inside software we cannot inspect, so the blanket "skip prompts" setting
+  // (which the user set for edits and commands) does not extend to it. The only automatic
+  // approval is the explicit opt-in below, and then only for tools the server calls read-only.
+  if (isMcpToolName(toolName)) {
+    return !!settings.autoApproveMcpReads && !!settings.mcpReadOnlyTools?.has(toolName);
+  }
 
   if (settings.skipApprovalPrompts) {
     if (toolName === 'edit_file' || toolName === 'create_file') return true;

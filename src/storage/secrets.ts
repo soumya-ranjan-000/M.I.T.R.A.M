@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 
 const API_KEY = 'mitram.apiKey';
+const MCP_PREFIX = 'mitram.mcpSecret.';
+
+/** Where an MCP server's API key is kept. Never settings.json, which may be synced or shared. */
+const mcpKey = (serverId: string) => `${MCP_PREFIX}${serverId}`;
 
 export class SecretStore {
   constructor(private readonly secrets: vscode.SecretStorage) {}
@@ -15,5 +19,29 @@ export class SecretStore {
 
   clearApiKey(): Thenable<void> {
     return this.secrets.delete(API_KEY);
+  }
+
+  /** The API key for one MCP server, or undefined if none has been set. */
+  getMcpKey(serverId: string): Thenable<string | undefined> {
+    return this.secrets.get(mcpKey(serverId));
+  }
+
+  setMcpKey(serverId: string, key: string): Thenable<void> {
+    return this.secrets.store(mcpKey(serverId), key);
+  }
+
+  clearMcpKey(serverId: string): Thenable<void> {
+    return this.secrets.delete(mcpKey(serverId));
+  }
+
+  /** Which of these servers have a key stored. Used to show "no API key set" in the UI. */
+  async mcpKeysPresent(serverIds: readonly string[]): Promise<Set<string>> {
+    const found = new Set<string>();
+    await Promise.all(
+      serverIds.map(async (id) => {
+        if (await this.secrets.get(mcpKey(id))) found.add(id);
+      }),
+    );
+    return found;
   }
 }

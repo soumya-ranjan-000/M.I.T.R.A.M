@@ -95,10 +95,24 @@ const PATHS = {
     </>
   ),
   diff: <path d="M12 3v14M5 10h14M5 21h14" />,
+  agent: (
+    <>
+      <path d="M12 8V4H8" />
+      <rect x="4" y="8" width="16" height="12" rx="2" />
+      <path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+    </>
+  ),
   undo: (
     <>
       <path d="M9 14 4 9l5-5" />
       <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11" />
+    </>
+  ),
+  plug: (
+    <>
+      <path d="M9 2v6M15 2v6" />
+      <path d="M6 8h12v3a6 6 0 0 1-12 0z" />
+      <path d="M12 17v5" />
     </>
   ),
 } as const;

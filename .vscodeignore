@@ -18,6 +18,8 @@ tsconfig.json
 vitest.config.ts
 dist/evals.js
 dist/retrieval-bench.js
+dist/mcp-smoke.js
+dist/mcp-smoke-playwright.js
 **/*.map
 **/*.ts
 *.vsix

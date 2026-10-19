@@ -1,6 +1,7 @@
+import * as path from 'node:path';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ChatMessage, ModelProvider, StopReason, ToolUse, Usage } from '../providers/ModelProvider';
-import { Tool, ToolContext, ToolRegistry, truncateMiddle } from '../tools/Tool';
+import { FilePort, Tool, ToolContext, ToolPreview, ToolRegistry, truncateMiddle } from '../tools/Tool';
 import type { ApprovalDecision, Board, ToolStatus } from '../webview/protocol';
 import { renderBoardForModel } from './board';
 import { estimateTokens, manageContextAsync } from './contextManager';
@@ -13,7 +14,7 @@ const MAX_UI_OUTPUT_CHARS = 4_000;
 export type AgentEvent =
   | { type: 'text'; text: string }
   | { type: 'thinking'; text: string }
-  | { type: 'tool_start'; id: string; name: string; summary: string; detail?: string; status: ToolStatus }
+  | { type: 'tool_start'; id: string; name: string; summary: string; detail?: string; badge?: string; status: ToolStatus }
   | { type: 'tool_update'; id: string; status: ToolStatus; output?: string }
   | { type: 'notice'; text: string }
   /** The run stopped early but can be continued: out of steps or time, or going in circles. */
@@ -52,6 +53,11 @@ export interface AgentOptions {
   /** Return true to run a tool that normally needs approval without asking. */
   isAutoApproved?: (tool: Tool, input: unknown) => boolean;
   requestApproval: (request: ApprovalRequest) => Promise<ApprovalDecision>;
+  /**
+   * Runs calls that need approval (the prompt and the call itself) one at a time across every
+   * agent sharing it, so parallel sub-agents never write at once or stack up approval prompts.
+   */
+  exclusive?: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
 class AbortedError extends Error {
@@ -157,21 +163,30 @@ export async function runAgent(options: AgentOptions): Promise<void> {
 
     const results: Anthropic.ToolResultBlockParam[] = [];
     let stuck = false;
-    for (const use of toolUses) {
+    // Calls to tools that change nothing (reads, searches, sub-agents) run at the same time;
+    // the others run one by one, in the order the model asked for them.
+    for (const batch of batchCalls(toolUses, registry)) {
       if (ctx.signal.aborted) {
-        results.push(toolResult(use.id, 'Cancelled by the user.', true));
-      } else if (stop === 'max_tokens') {
+        for (const use of batch) results.push(toolResult(use.id, 'Cancelled by the user.', true));
+        continue;
+      }
+      if (stop === 'max_tokens') {
         // The call may have been cut off mid-input, so never run it.
-        results.push(toolResult(use.id, 'The response was cut off before this call completed. Retry with smaller steps.', true));
-      } else {
-        const done = await executeTool(use, options);
-        const verdict = tracker.record(use.name, use.input, done.outcome, done.output);
+        for (const use of batch) {
+          results.push(toolResult(use.id, 'The response was cut off before this call completed. Retry with smaller steps.', true));
+        }
+        continue;
+      }
+      const runs = await Promise.all(batch.map((use) => executeTool(use, options)));
+      batch.forEach((use, i) => {
+        const done = runs[i];
+        const verdict = tracker.record(use.name, use.input, done.outcome, done.output, done.changed);
         if (verdict === 'warn' || verdict === 'stop') {
           done.block.content = `${done.block.content}\n\n[Note: this exact call has now given the same result several times. Do something different: change the approach, or mark the task blocked and ask the user.]`;
         }
         if (verdict === 'stop') stuck = true;
         results.push(done.block);
-      }
+      });
     }
     history.push({ role: 'user', content: results });
 
@@ -199,14 +214,42 @@ interface ToolRun {
   outcome: ToolOutcome;
   /** The text of the result, for the run tracker. */
   output: string;
+  /** Workspace-relative paths of the files the call wrote, including through a sub-agent it started. */
+  changed?: string[];
 }
+
+/** Groups calls to run at once: consecutive calls to tools that change nothing share a group. */
+function batchCalls(uses: ToolUse[], registry: ToolRegistry): ToolUse[][] {
+  const batches: ToolUse[][] = [];
+  let previousSafe = false;
+  for (const use of uses) {
+    const safe = registry.get(use.name)?.requiresApproval === false;
+    if (safe && previousSafe) batches[batches.length - 1].push(use);
+    else batches.push([use]);
+    previousSafe = safe;
+  }
+  return batches;
+}
+
+/** Wraps a FilePort so the absolute path of every file written through it is added to `into`. */
+export function recordWrites(inner: FilePort, into: Set<string>): FilePort {
+  return {
+    ...inner,
+    async writeText(abs, content) {
+      await inner.writeText(abs, content);
+      into.add(abs);
+    },
+  };
+}
+
+const runDirectly = <T>(fn: () => Promise<T>): Promise<T> => fn();
 
 function finished(id: string, content: string, outcome: ToolOutcome): ToolRun {
   return { block: toolResult(id, content, outcome !== 'ok') as ToolRun['block'], outcome, output: content };
 }
 
 async function executeTool(use: ToolUse, options: AgentOptions): Promise<ToolRun> {
-  const { registry, ctx, onEvent } = options;
+  const { registry, onEvent } = options;
   const tool = registry.get(use.name);
   if (!tool) {
     onEvent({ type: 'tool_start', id: use.id, name: use.name, summary: use.name, status: 'error' });
@@ -214,9 +257,12 @@ async function executeTool(use: ToolUse, options: AgentOptions): Promise<ToolRun
     return finished(use.id, `Unknown tool "${use.name}".`, 'error');
   }
 
-  let preview = { summary: tool.name, detail: undefined as string | undefined };
+  const written = new Set<string>();
+  const ctx: ToolContext = { ...options.ctx, callId: use.id, files: recordWrites(options.ctx.files, written) };
+
+  let preview: ToolPreview = { summary: tool.name };
   try {
-    preview = { detail: undefined, ...tool.preview(use.input) };
+    preview = tool.preview(use.input);
   } catch {
     // Malformed input: run() will report a precise error to the model.
   }
@@ -233,6 +279,14 @@ async function executeTool(use: ToolUse, options: AgentOptions): Promise<ToolRun
     return finished(use.id, `Blocked by safety policy: ${blocked} Do not retry this; choose a safer approach or ask the user.`, 'error');
   }
 
+  const exclusive = tool.requiresApproval && options.exclusive ? options.exclusive : runDirectly;
+  const done = await exclusive(() => approveAndRun(tool, use, preview, ctx, options));
+  const changed = [...written].map((abs) => path.relative(ctx.root, abs));
+  return changed.length ? { ...done, changed } : done;
+}
+
+async function approveAndRun(tool: Tool, use: ToolUse, preview: ToolPreview, ctx: ToolContext, options: AgentOptions): Promise<ToolRun> {
+  const { onEvent } = options;
   // Decide before showing the card, so auto-approved actions never flash approval buttons.
   const needsPrompt = tool.requiresApproval && !options.isAutoApproved?.(tool, use.input);
 
@@ -242,11 +296,12 @@ async function executeTool(use: ToolUse, options: AgentOptions): Promise<ToolRun
     name: tool.name,
     summary: preview.summary,
     detail: preview.detail,
+    ...(preview.badge ? { badge: preview.badge } : {}),
     status: needsPrompt ? 'pending' : 'running',
   });
 
   if (needsPrompt) {
-    const decision = await options.requestApproval({ id: use.id, tool, input: use.input, ...preview });
+    const decision = await options.requestApproval({ id: use.id, tool, input: use.input, summary: preview.summary, detail: preview.detail });
     if (decision === 'reject') {
       onEvent({ type: 'tool_update', id: use.id, status: 'rejected' });
       return finished(use.id, 'The user rejected this action. Do not retry it; ask what they want instead.', 'rejected');

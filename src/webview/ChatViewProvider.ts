@@ -11,7 +11,8 @@ import { Retrieval, Retriever } from '../agent/retrieve';
 import { resolveInWorkspace } from '../safety/workspaceGuard';
 import { pruneAttachments } from '../agent/attachments';
 import { ReadResult, readAttachment } from '../agent/fileReaders';
-import { buildSystemPrompt } from '../agent/SystemPrompt';
+import { buildSubagentPrompt, buildSystemPrompt } from '../agent/SystemPrompt';
+import { createSubagentRunner } from '../agent/subagents';
 import { AnthropicProvider } from '../providers/AnthropicProvider';
 import { describeError } from '../providers/ModelProvider';
 import { CommandRuleStore } from '../storage/commandRules';
@@ -29,8 +30,13 @@ import {
   suggestCommandRule,
 } from '../safety/commandPolicy';
 import { Logger } from '../logging';
-import { createDefaultRegistry } from '../tools';
-import { ToolRegistry } from '../tools/Tool';
+import { McpConfigStore, McpServerEntry } from '../mcp/McpConfigStore';
+import { McpManager } from '../mcp/McpManager';
+import { MCP_PRESETS, McpPreset, buildEntry } from '../mcp/presets';
+import { McpTrustStore } from '../storage/mcpTrust';
+import { createRegistry } from '../tools';
+import { createDelegateTaskTool } from '../tools/delegateTask';
+import { Tool, ToolRegistry } from '../tools/Tool';
 import { createDiagnosticsReader, createVscodeFilePort } from '../tools/vscodeHost';
 import { applyHostEvent } from './displayReducer';
 import { ProposalContentProvider } from './ProposalContentProvider';
@@ -58,6 +64,8 @@ interface Run {
 }
 
 const MODEL_KEY = 'mitram.model';
+/** Steps one sub-agent may take: enough for a focused task, short of the main agent's budget. */
+const SUBAGENT_MAX_STEPS = 40;
 const OTHER_MODEL = 'Enter another model or deployment name…';
 
 const FILE_EXCLUDE = '**/{node_modules,.git,dist,out,build,.vscode-test}/**';
@@ -94,6 +102,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly commandRules: CommandRuleStore,
     private readonly logger: Logger,
     subscriptions: vscode.Disposable[],
+    private readonly mcp?: McpManager,
+    private readonly mcpConfig?: McpConfigStore,
+    private readonly trust?: McpTrustStore,
   ) {
     this.lastEditor = pickEditor(vscode.window.activeTextEditor);
     subscriptions.push(
@@ -107,8 +118,217 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('mitram.model')) this.postModel();
+        // Reconnect when the servers change, so edits to settings.json take effect without a reload.
+        if (e.affectsConfiguration('mitram.mcpServers')) void this.refreshMcp();
       }),
     );
+  }
+
+  /** Reconnects MCP servers after a settings change and tells the webview. */
+  private async refreshMcp(): Promise<void> {
+    await this.mcp?.refresh();
+    this.postMcpStatus();
+  }
+
+  /** Sends the MCP panel fresh data. Called by the manager whenever a server's state changes. */
+  refreshMcpPanel(): void {
+    this.postMcpStatus();
+  }
+
+  /**
+   * The "Add MCP server" wizard: pick a preset (or describe a custom server), answer what it
+   * needs, then store its API key.
+   *
+   * It runs entirely in the host, through VS Code's own prompts. That is deliberate: the key is
+   * typed into a native password box and goes straight to secret storage, so it never passes
+   * through the webview or into settings.json.
+   */
+  private async addMcpServer(): Promise<void> {
+    if (!this.mcpConfig) return;
+
+    const items: (vscode.QuickPickItem & { preset?: McpPreset })[] = [
+      ...MCP_PRESETS.map((preset) => ({
+        label: preset.label,
+        detail: preset.description,
+        description: preset.secret ? 'needs an API key' : undefined,
+        preset,
+      })),
+      { label: 'Custom…', detail: 'Enter a command or URL yourself.' },
+    ];
+    const picked = await vscode.window.showQuickPick(items, {
+      title: 'Add MCP server',
+      placeHolder: 'Choose a server to add',
+      matchOnDetail: true,
+    });
+    if (!picked) return;
+
+    const added = picked.preset ? await this.addFromPreset(picked.preset) : await this.addCustomMcpServer();
+    if (!added) return;
+
+    // A server the user just added is one they mean to run.
+    this.mcp?.resetTrust();
+    await this.mcpTrustSet(true);
+    await this.mcp?.refresh();
+    this.postMcpStatus();
+    void vscode.window.showInformationMessage(`M.I.T.R.A.M: added the MCP server "${added}".`);
+  }
+
+  /** Asks for a preset's fields and key, then writes it to settings. Returns the new server id. */
+  private async addFromPreset(preset: McpPreset): Promise<string | undefined> {
+    const answers: Record<string, string> = {};
+    for (const field of preset.fields ?? []) {
+      const value = await vscode.window.showInputBox({
+        title: `Add ${preset.label}`,
+        prompt: field.label,
+        placeHolder: field.placeholder,
+        // `hint` explains where to find the value, so keep it visible while typing.
+        ignoreFocusOut: true,
+        value: field.placeholder && field.id === 'url' ? field.placeholder : undefined,
+        validateInput: (text) => (text.trim() ? null : `${field.label} is required.`),
+      });
+      if (value === undefined) return undefined;
+      answers[field.id] = value.trim();
+    }
+
+    const id = this.mcpConfig!.freeId(preset.id);
+    if (preset.secret && !(await this.promptMcpKey(id, preset.secret.label, preset.secret.hint))) return undefined;
+
+    await this.mcpConfig!.add(id, buildEntry(preset, answers));
+    return id;
+  }
+
+  /** The "Custom…" path: a command line or a URL, typed by the user. */
+  private async addCustomMcpServer(): Promise<string | undefined> {
+    const kind = await vscode.window.showQuickPick(
+      [
+        { label: 'Local command', detail: 'Run a server on this machine, e.g. npx -y @playwright/mcp@latest', local: true },
+        { label: 'Remote URL', detail: 'Connect to a server over https', local: false },
+      ],
+      { title: 'Add MCP server', placeHolder: 'How should M.I.T.R.A.M reach this server?' },
+    );
+    if (!kind) return undefined;
+
+    const name = await vscode.window.showInputBox({
+      title: 'Add MCP server',
+      prompt: 'A short name for this server',
+      placeHolder: 'my-server',
+      ignoreFocusOut: true,
+      validateInput: (text) => (text.trim() ? null : 'A name is required.'),
+    });
+    if (name === undefined) return undefined;
+
+    const entry: McpServerEntry = {};
+    if (kind.local) {
+      const command = await vscode.window.showInputBox({
+        title: 'Add MCP server',
+        prompt: 'The command that starts the server',
+        placeHolder: 'npx -y @playwright/mcp@latest',
+        ignoreFocusOut: true,
+        validateInput: (text) => (text.trim() ? null : 'A command is required.'),
+      });
+      if (command === undefined) return undefined;
+      // Split on whitespace: good enough for the "program arg arg" form these commands take.
+      const parts = command.trim().split(/\s+/);
+      entry.command = parts[0];
+      if (parts.length > 1) entry.args = parts.slice(1);
+    } else {
+      const url = await vscode.window.showInputBox({
+        title: 'Add MCP server',
+        prompt: 'The server URL',
+        placeHolder: 'https://mcp.example.com/mcp',
+        ignoreFocusOut: true,
+        validateInput: (text) => {
+          const value = text.trim();
+          if (!value) return 'A URL is required.';
+          try {
+            const parsed = new URL(value);
+            const local = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+            return parsed.protocol === 'https:' || local ? null : 'The URL must use https, unless it points at localhost.';
+          } catch {
+            return 'That is not a valid URL.';
+          }
+        },
+      });
+      if (url === undefined) return undefined;
+      entry.url = url.trim();
+    }
+
+    const id = this.mcpConfig!.freeId(name);
+    const wantsKey = await vscode.window.showQuickPick(
+      [
+        { label: 'No authentication', needsKey: false },
+        { label: 'API key', detail: 'Stored in VS Code secret storage, never in settings.json', needsKey: true },
+      ],
+      { title: `Add ${id}`, placeHolder: 'Does this server need an API key?' },
+    );
+    if (!wantsKey) return undefined;
+
+    if (wantsKey.needsKey) {
+      const header = kind.local
+        ? await vscode.window.showInputBox({
+            title: `Add ${id}`,
+            prompt: 'Name of the environment variable that holds the key',
+            placeHolder: 'API_TOKEN',
+            ignoreFocusOut: true,
+            validateInput: (text) => (text.trim() ? null : 'A name is required.'),
+          })
+        : 'Authorization';
+      if (header === undefined) return undefined;
+      entry.auth = kind.local
+        ? { kind: 'env', name: header.trim() }
+        : { kind: 'header', name: 'Authorization', format: 'Bearer {key}' };
+      if (!(await this.promptMcpKey(id, `API key for ${id}`, 'Stored in VS Code secret storage, never in settings.json.'))) {
+        return undefined;
+      }
+    }
+
+    await this.mcpConfig!.add(id, entry);
+    return id;
+  }
+
+  /** Prompts for a server's API key and stores it. The key never leaves the host. */
+  private async promptMcpKey(id: string, label: string, hint: string): Promise<boolean> {
+    const key = await vscode.window.showInputBox({
+      title: label,
+      prompt: hint,
+      password: true,
+      ignoreFocusOut: true,
+      validateInput: (text) => (text.trim() ? null : 'A key is required.'),
+    });
+    if (key === undefined) return false;
+    await this.secrets.setMcpKey(id, key.trim());
+    return true;
+  }
+
+  /** Sets or replaces one server's API key, then reconnects it. */
+  private async setMcpKey(id: string): Promise<void> {
+    const server = this.mcp?.status().find((s) => s.id === id);
+    if (!server) return;
+    const stored = await this.promptMcpKey(id, `API key for ${id}`, 'Stored in VS Code secret storage, never in settings.json.');
+    if (!stored) return;
+    await this.mcp?.restart(id);
+    this.postMcpStatus();
+  }
+
+  /** Removes a server after confirming, and forgets its API key. */
+  private async removeMcpServer(id: string): Promise<void> {
+    if (!this.mcpConfig?.has(id)) return;
+    const choice = await vscode.window.showWarningMessage(
+      `Remove the MCP server "${id}"?`,
+      { modal: true, detail: 'Its settings entry and any stored API key are deleted. You can add it again later.' },
+      'Remove',
+    );
+    if (choice !== 'Remove') return;
+
+    await this.mcpConfig.remove(id);
+    // Leaving a key behind would quietly reauthenticate a server added again under the same name.
+    await this.secrets.clearMcpKey(id);
+    await this.refreshMcp();
+  }
+
+  /** Records that this workspace may run MCP servers, after the user added one deliberately. */
+  private async mcpTrustSet(trusted: boolean): Promise<void> {
+    await this.trust?.set(trusted);
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -244,6 +464,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           files: await this.searchFiles(message.query),
         });
         break;
+      case 'mcpRefresh':
+        this.postMcpStatus();
+        break;
+      case 'mcpAdd':
+        await this.addMcpServer();
+        break;
+      case 'mcpRemove':
+        await this.removeMcpServer(message.id);
+        break;
+      case 'mcpEnable':
+        await this.mcpConfig?.setEnabled(message.id, message.enabled);
+        await this.refreshMcp();
+        break;
+      case 'mcpSetKey':
+        await this.setMcpKey(message.id);
+        break;
+      case 'mcpRestart':
+        await this.mcp?.restart(message.id);
+        this.postMcpStatus();
+        break;
     }
   }
 
@@ -300,6 +540,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private postBoard(): void {
     this.post({ type: 'board', board: this.session.board ?? emptyBoard() });
+  }
+
+  /**
+   * Sends the MCP panel its data. `hasKey` only says whether a key is stored; the key itself
+   * never leaves the host.
+   */
+  private postMcpStatus(): void {
+    if (!this.mcp) return;
+    void (async () => {
+      const servers = this.mcp!.status();
+      const stored = await this.secrets.mcpKeysPresent(servers.map((s) => s.id));
+      this.post({
+        type: 'mcpStatus',
+        servers: servers.map((s) => ({ ...s, hasKey: stored.has(s.id) })),
+        presets: MCP_PRESETS.map(({ id, label, description, secret }) => ({ id, label, description, needsKey: !!secret })),
+        problems: this.mcpConfig?.list().problems ?? [],
+      });
+    })();
   }
 
   private async clearBoard(): Promise<void> {
@@ -436,14 +694,57 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
-    const fullRegistry = root ? createDefaultRegistry() : new ToolRegistry();
+    // Connects MCP servers on the first run that needs them; a failed server costs only its tools.
+    if (root && this.mcp?.configured) this.emit(session, { type: 'notice', text: 'Connecting to MCP servers…' });
+    const fullRegistry = root ? await createRegistry(this.mcp) : new ToolRegistry();
+    if (root && this.mcp?.configured) this.postMcpStatus();
     // Plan mode: read-only tools, so nothing can change until the user approves the plan.
+    // MCP tools all require approval, so readOnly() leaves them out automatically.
     const registry = run.plan ? fullRegistry.readOnly() : fullRegistry;
+    // Sub-agents inherit these tools, so in plan mode they can only read as well.
+    const useSubagents = !!root && settings.subagents;
+    if (useSubagents) registry.register(createDelegateTaskTool({ canImplement: !run.plan }));
     session.board ??= emptyBoard();
     // A resumed run keeps the earlier revert point, so one long task can be undone as a whole.
     const existing = this.checkpoints.get(session.id);
     const checkpoint = run.continueTask && existing ? existing : new Checkpoint();
     this.checkpoints.set(session.id, checkpoint);
+
+    const date = new Date().toISOString().slice(0, 10);
+    const projectInstructions = root ? await loadProjectInstructions(root) : null;
+    const autoApprove = (tool: Tool, input: unknown) =>
+      isAutoApproved(
+        tool.name,
+        input,
+        {
+          skipApprovalPrompts: settings.skipApprovalPrompts,
+          autoApproveEdits: settings.autoApproveEdits,
+          autoApproveSafeCommands: settings.autoApproveSafeCommands,
+          autoApproveCommands: compileAnchoredPatterns(settings.autoApproveCommands),
+          // Read the saved rules on every call, so "Always allow" applies within this run too.
+          allowedCommands: this.commandRules.list(),
+          autoApproveMcpReads: settings.autoApproveMcpReads,
+          mcpReadOnlyTools: this.mcp?.readOnlyToolNames(),
+        },
+        this.alwaysAllowed,
+      );
+    const subagents =
+      useSubagents && root
+        ? createSubagentRunner({
+            provider,
+            registry,
+            system: (readOnly) => buildSubagentPrompt({ root, platform: process.platform, date, projectInstructions, readOnly }),
+            maxSteps: Math.min(settings.maxIterations, SUBAGENT_MAX_STEPS),
+            maxConcurrent: settings.maxParallelSubagents,
+            contextWindow: settings.contextWindow,
+            summarizeContext: settings.summarizeContext,
+            onEvent: (parentId, event) => this.onSubagentEvent(session, parentId, event),
+            onNote: (id, note) => this.emit(session, { type: 'toolNote', id, note }),
+            isAutoApproved: autoApprove,
+            requestApproval: (request, parentId) => this.askApproval(session, request, abort.signal, parentId),
+            log: (message) => this.logger.info(message),
+          })
+        : undefined;
 
     this.logger.info(`run start: model=${this.activeModel()} plan=${run.plan} tools=${registry.size} retry=${isRetry}`);
     try {
@@ -452,9 +753,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         system: buildSystemPrompt({
           root,
           platform: process.platform,
-          date: new Date().toISOString().slice(0, 10),
-          projectInstructions: root ? await loadProjectInstructions(root) : null,
+          date,
+          projectInstructions,
           planMode: run.plan,
+          subagents: useSubagents,
+          // Only servers that actually connected: naming one with no tools would mislead the model.
+          mcpServers: this.mcp?.status().filter((s) => s.status === 'ready' && s.toolCount > 0).map((s) => s.id),
         }),
         history: session.history,
         registry,
@@ -471,6 +775,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
               if (session === this.session) this.post({ type: 'board', board });
             },
           },
+          subagents,
         },
         maxIterations: settings.maxIterations,
         maxRunMs: settings.maxRunMinutes * 60_000,
@@ -479,20 +784,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         getBoard: () => session.board ?? emptyBoard(),
         contextWindow: settings.contextWindow,
         onEvent: (event) => this.onAgentEvent(session, event),
-        isAutoApproved: (tool, input) =>
-          isAutoApproved(
-            tool.name,
-            input,
-            {
-              skipApprovalPrompts: settings.skipApprovalPrompts,
-              autoApproveEdits: settings.autoApproveEdits,
-              autoApproveSafeCommands: settings.autoApproveSafeCommands,
-              autoApproveCommands: compileAnchoredPatterns(settings.autoApproveCommands),
-              // Read the saved rules on every call, so "Always allow" applies within this run too.
-              allowedCommands: this.commandRules.list(),
-            },
-            this.alwaysAllowed,
-          ),
+        isAutoApproved: autoApprove,
         requestApproval: (request) => this.askApproval(session, request, abort.signal),
       });
       this.lastRun = undefined;
@@ -568,14 +860,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private askApproval(session: Session, request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalDecision> {
+  /** A sub-agent's event: its tool calls go on its card, and its text and reasoning stay out of the chat. */
+  private onSubagentEvent(session: Session, parentId: string, event: AgentEvent): void {
+    switch (event.type) {
+      case 'tool_start':
+        this.toolNames.set(event.id, event.name);
+        this.emit(session, { ...event, type: 'toolStart', parentId });
+        break;
+      case 'tool_update':
+        if (event.status !== 'running' && event.status !== 'pending') {
+          this.logger.info(`subagent tool ${this.toolNames.get(event.id) ?? '?'}: ${event.status}`);
+        }
+        this.emit(session, { ...event, type: 'toolUpdate', parentId });
+        break;
+      case 'notice':
+        this.logger.info(`subagent notice: ${event.text}`);
+        break;
+    }
+  }
+
+  /** `parentId` is set when a sub-agent asks: the id of its card, which shows the request. */
+  private askApproval(session: Session, request: ApprovalRequest, signal: AbortSignal, parentId?: string): Promise<ApprovalDecision> {
     const name = request.tool.name;
     const { id } = request;
     // The host works out the rule and keeps it here, so the webview can only accept or decline it.
     const rule =
       name === 'run_command' ? suggestCommandRule(String((request.input as { command?: unknown } | null)?.command ?? '')) : null;
     if (rule) {
-      this.emit(session, { type: 'toolAllowRule', id, label: describeRule(rule), usesShell: hasShellSyntax(rule.command) });
+      this.emit(session, { type: 'toolAllowRule', id, label: describeRule(rule), usesShell: hasShellSyntax(rule.command), parentId });
     }
     this.pendingTools.set(id, request);
     const settle = () => {

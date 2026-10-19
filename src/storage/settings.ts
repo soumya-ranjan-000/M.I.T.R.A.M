@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { McpServerConfig, parseServers } from '../mcp/config';
 
 export interface MitramSettings {
   endpoint: string;
@@ -19,6 +20,15 @@ export interface MitramSettings {
   maxRunMinutes: number;
   verifyBeforeDone: boolean;
   summarizeContext: boolean;
+  subagents: boolean;
+  maxParallelSubagents: number;
+  /** MCP servers whose tools the agent may use, after validation. */
+  mcpServers: McpServerConfig[];
+  /** Reasons entries in `mitram.mcpServers` were rejected or adjusted. */
+  mcpProblems: string[];
+  blockedMcpTools: string[];
+  autoApproveMcpReads: boolean;
+  mcpToolLimit: number;
 }
 
 export function readSettings(): MitramSettings {
@@ -42,5 +52,22 @@ export function readSettings(): MitramSettings {
     maxRunMinutes: Math.max(0, cfg.get<number>('maxRunMinutes', 20)),
     verifyBeforeDone: cfg.get<boolean>('verifyBeforeDone', true),
     summarizeContext: cfg.get<boolean>('summarizeContext', true),
+    subagents: cfg.get<boolean>('subagents', true),
+    maxParallelSubagents: Math.min(8, Math.max(1, Math.floor(cfg.get<number>('maxParallelSubagents', 3)))),
+    ...readMcp(cfg),
+  };
+}
+
+/** The MCP part of the settings: validated servers plus the reasons any entry was rejected. */
+function readMcp(cfg: vscode.WorkspaceConfiguration) {
+  // Only the user-level value counts: a repository must never be able to start a process.
+  const raw = cfg.inspect<unknown>('mcpServers');
+  const { servers, problems } = parseServers(raw?.globalValue ?? raw?.defaultValue, process.env);
+  return {
+    mcpServers: servers,
+    mcpProblems: problems,
+    blockedMcpTools: cfg.get<string[]>('blockedMcpTools', []),
+    autoApproveMcpReads: cfg.get<boolean>('autoApproveMcpReads', false),
+    mcpToolLimit: Math.min(200, Math.max(1, Math.floor(cfg.get<number>('mcpToolLimit', 60)))),
   };
 }

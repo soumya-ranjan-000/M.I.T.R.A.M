@@ -1,7 +1,22 @@
 # MCP support in M.I.T.R.A.M
 
-> **Status: proposed.** This is the plan for Phase 7 in `PLAN.md` ("MCP client support" in the
-> post-MVP backlog). Nothing here is implemented yet.
+> **Status: implemented.** Phase 7 in `PLAN.md` is complete. The design below is what was built,
+> with two changes agreed before the work started:
+>
+> - **Servers are managed from the chat view**, not only from `settings.json`. The plug icon in
+>   the header (or `/mcp`) opens an **MCP servers** panel: add, remove, enable, set an API key,
+>   reconnect. It writes `mitram.mcpServers` in user settings, so editing by hand still works.
+>   The add wizard and the key prompt run in the extension host, through VS Code's own
+>   `QuickPick`/`InputBox`, so an API key is never typed into the webview.
+> - **Authentication is by API key**, set per server and kept in `SecretStorage` under
+>   `mitram.mcpSecret.<id>`. A key is sent either as an HTTP header (`Authorization: Bearer …`,
+>   as hosted services such as Atlassian expect) or as an environment variable for a local
+>   server. OAuth is deliberately **not** supported; it would be a separate piece of work.
+>
+> Also added beyond the original plan: the legacy **SSE** transport (Atlassian's endpoint ends in
+> `/sse`), a **preset catalogue** (`src/mcp/presets.ts`: Playwright, GitHub, Filesystem,
+> Atlassian, PostgreSQL, Sentry), and two smoke tests that drive real spawned servers
+> (`npm run smoke:mcp`, `npm run smoke:mcp:playwright`).
 
 ## Scope
 
@@ -10,7 +25,7 @@ M.I.T.R.A.M becomes an **MCP client/host**: it connects to MCP servers the user 
 to the agent loop as ordinary `Tool` objects. Server **resources** and **prompts** come later;
 tools are what the agent loop already understands.
 
-Out of scope for this plan (noted at the end): shipping M.I.T.R.A.M itself *as* an MCP server
+Out of scope for this plan (noted at the end): shipping M.I.T.R.A.M itself _as_ an MCP server
 that other clients call.
 
 ## Why it fits cleanly
@@ -20,11 +35,11 @@ The agent loop never sees tools concretely — it only uses `ToolRegistry.defini
 another object implementing `Tool` (`src/tools/Tool.ts:45`). The work is almost entirely in three
 places:
 
-| Concern | Today | With MCP |
-| --- | --- | --- |
-| Registry construction | `createDefaultRegistry()`, sync (`src/tools/index.ts`) | needs an async step that adds connected servers' tools |
-| Approval | keyed by tool name (`src/safety/approvalPolicy.ts`) | needs per-server/per-tool rules |
-| `readOnly()` for plan mode | `!requiresApproval` (`src/tools/Tool.ts:81`) | MCP tools default to "needs approval", so plan mode stays safe automatically |
+| Concern                    | Today                                                  | With MCP                                                                     |
+| -------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Registry construction      | `createDefaultRegistry()`, sync (`src/tools/index.ts`) | needs an async step that adds connected servers' tools                       |
+| Approval                   | keyed by tool name (`src/safety/approvalPolicy.ts`)    | needs per-server/per-tool rules                                              |
+| `readOnly()` for plan mode | `!requiresApproval` (`src/tools/Tool.ts:81`)           | MCP tools default to "needs approval", so plan mode stays safe automatically |
 
 ## Design decisions
 
@@ -36,7 +51,7 @@ places:
 2. **Everything needs approval by default.** `requiresApproval: true` unless the server declares
    `annotations.readOnlyHint === true` **and** the user has enabled auto-approve for reads on that
    server. Server-supplied annotations are a hint from untrusted software, so they can only ever
-   *downgrade* to "ask once" behaviour the user opted into, never skip a gate the user wants.
+   _downgrade_ to "ask once" behaviour the user opted into, never skip a gate the user wants.
 3. **Server output is untrusted.** Tool results go into `tool_result` blocks only, exactly like
    file contents today (Phase 3.5). The system prompt gains one line saying MCP results are data.
    Never auto-approve a follow-up based on an MCP result.
@@ -81,6 +96,7 @@ Touched: `src/tools/index.ts`, `src/webview/ChatViewProvider.ts`, `src/safety/ap
 ## Phase 7: MCP client
 
 ### 7.1 Config shape and settings
+
 Add `mitram.mcpServers` (scope `application`, so a repo cannot inject one — the
 `test/settingsScope.test.ts` list gains this key):
 
@@ -101,6 +117,7 @@ not sit in `settings.json`.
 reported in the log instead of throwing.
 
 ### 7.2 `McpClient` — one server
+
 Wraps the SDK `Client`. Responsibilities: connect with a timeout (10 s default), `listTools()`
 once after connect, `callTool(name, args, signal)` with a per-call timeout (60 s default), expose
 `status: 'connecting' | 'ready' | 'failed' | 'disabled'` plus the last error, and `close()` that
@@ -110,15 +127,21 @@ kills the child process. Never log `env` values or headers.
 closes cleanly; a server that never responds fails with a clear message after the timeout.
 
 ### 7.3 `mcpTool.ts` — adapter to `Tool`
+
 ```ts
-export function mcpTool(server: string, def: McpToolDefinition, client: McpClient): Tool
+export function mcpTool(
+  server: string,
+  def: McpToolDefinition,
+  client: McpClient,
+): Tool;
 ```
+
 - `name`: `encodeToolName(server, def.name)` (7.0 naming rules).
 - `description`: server's description, prefixed with `[server]`, truncated (~1 kB) so a chatty
   server cannot flood the prompt.
 - `inputSchema`: the server's JSON Schema, after a shape check (`type: 'object'`); otherwise fall
   back to a permissive object schema.
-- `requiresApproval`: `true` unless read-only-hinted *and* allowed by settings (decision 2).
+- `requiresApproval`: `true` unless read-only-hinted _and_ allowed by settings (decision 2).
 - `preview`: `{ summary: "<server>: <tool>", detail: <pretty-printed args, capped> }` — the user
   must see the exact arguments before approving.
 - `run`: `client.callTool(...)`, then flatten the result content to text
@@ -132,6 +155,7 @@ export function mcpTool(server: string, def: McpToolDefinition, client: McpClien
 truncation, server-side error, and cancellation via `ctx.signal`.
 
 ### 7.4 `McpManager` — lifecycle
+
 Created once in `activate()` and pushed to `context.subscriptions`. Connects enabled servers
 lazily (first run that needs tools) and in parallel, caches clients across runs, exposes
 `tools(): Tool[]` and `status(): McpServerStatus[]`, and offers `restart(server)` and
@@ -143,13 +167,15 @@ servers after window reload is the main risk here.
 reload, and no child process survives `deactivate()`.
 
 ### 7.5 Wire into the run
+
 `createDefaultRegistry()` stays sync and built-in-only. Add in `src/tools/index.ts`:
 
 ```ts
-export async function createRegistry(mcp?: McpManager): Promise<ToolRegistry>
+export async function createRegistry(mcp?: McpManager): Promise<ToolRegistry>;
 ```
 
 `ChatViewProvider.run()` (`src/webview/ChatViewProvider.ts:416`) awaits it. Guards:
+
 - Cap total MCP tools (e.g. 60) and log which were dropped; tool definitions cost prompt tokens on
   every request and are inside the cache breakpoint.
 - Connection happens with a status event to the webview so the user sees "Connecting to 2 MCP
@@ -162,11 +188,12 @@ export async function createRegistry(mcp?: McpManager): Promise<ToolRegistry>
 configured servers nothing about today's behaviour changes (existing tests all still pass).
 
 ### 7.6 Safety
+
 - **Trust prompt.** The first time a workspace would start MCP servers, ask once:
   "Start N MCP servers for this folder?" with Yes / Not now / Never, stored in `workspaceState`
   (same pattern as `CommandRuleStore`). Servers are arbitrary local processes — this gate matters.
 - **Approval policy.** Extend `isAutoApproved` (`src/safety/approvalPolicy.ts`) with an
-  `mcp__…` branch: auto-approve only if the user set `mitram.autoApproveMcpReads` *and* the tool is
+  `mcp__…` branch: auto-approve only if the user set `mitram.autoApproveMcpReads` _and_ the tool is
   read-only-hinted, or an explicit "Always allow" was saved for that exact tool name. The existing
   `alwaysAllowed` set is already keyed by tool name, so the "Always allow" button works unchanged.
 - **Denylist.** A `mitram.blockedMcpTools` array of patterns, checked in `Tool.policy` → blocked
@@ -180,6 +207,7 @@ configured servers nothing about today's behaviour changes (existing tests all s
 user configured, and the trust prompt blocks spawning until answered.
 
 ### 7.7 UI
+
 - Tool cards: show `server: tool` with a small MCP badge (reuse the existing `ToolCard`; the only
   new thing is the badge and "no diff preview" note on the approval card).
 - Status surface: a line in the settings/model area — "MCP: github ✓, docs ✗ (failed)" — with a
@@ -191,6 +219,7 @@ user configured, and the trust prompt blocks spawning until answered.
 **Done when:** a failing server is visible and recoverable from the UI without opening the log.
 
 ### 7.8 Docs and release
+
 README section (configuring servers, the trust model, that MCP tools have no diff preview),
 CHANGELOG entry, and one eval task in `test/evals/` driving a trivial local stdio server so
 regressions show up.
@@ -204,7 +233,7 @@ regressions show up.
 - **Resources** — `resources/list` + `resources/read` surfaced as `@`-mentions in the composer,
   reusing the attachment path in `src/agent/attachments.ts`.
 - **Prompts** — server-provided prompts as slash commands.
-- **Sampling** — servers asking *us* to call the model. Needs its own approval design; skip.
+- **Sampling** — servers asking _us_ to call the model. Needs its own approval design; skip.
 - **M.I.T.R.A.M as an MCP server** — exposing `read_file`/`edit_file`/`run_command` over MCP so
   Claude Desktop or another client can drive this workspace. Technically small (the `Tool` registry
   is already transport-agnostic), but it inverts the trust model: approvals and checkpoints live in
@@ -212,11 +241,11 @@ regressions show up.
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Orphaned child processes | kill process group on dispose; integration test asserts exit |
-| Prompt bloat from many tools | cap tool count, truncate descriptions, keep inside the cache breakpoint |
-| Untrusted server output | `tool_result` only, never influences approval, system-prompt line |
-| Malicious config in a repo | `application` scope + per-workspace trust prompt |
-| SDK bundling issues | verify esbuild output early (7.0), before building on top of it |
-| Slow first message | connect in parallel with a timeout, show status, never block on a failed server |
+| Risk                         | Mitigation                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------- |
+| Orphaned child processes     | kill process group on dispose; integration test asserts exit                    |
+| Prompt bloat from many tools | cap tool count, truncate descriptions, keep inside the cache breakpoint         |
+| Untrusted server output      | `tool_result` only, never influences approval, system-prompt line               |
+| Malicious config in a repo   | `application` scope + per-workspace trust prompt                                |
+| SDK bundling issues          | verify esbuild output early (7.0), before building on top of it                 |
+| Slow first message           | connect in parallel with a timeout, show status, never block on a failed server |

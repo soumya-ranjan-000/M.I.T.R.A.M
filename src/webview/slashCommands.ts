@@ -12,6 +12,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'plan', description: 'Toggle plan mode: investigate and propose a plan before changing anything' },
   { name: 'model', description: 'Choose the model' },
   { name: 'permissions', description: 'Review commands that run without asking in this workspace' },
+  { name: 'mcp', description: 'Manage MCP servers and the extra tools they give the agent' },
 ];
 
 const names = (c: SlashCommand) => [c.name, ...(c.aliases ?? [])];

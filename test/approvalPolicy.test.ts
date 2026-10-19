@@ -97,4 +97,62 @@ describe('isAutoApproved', () => {
     expect(isAutoApproved('run_command', null, on, none)).toBe(false);
     expect(isAutoApproved('run_command', cmd('   '), on, none)).toBe(false);
   });
+
+  describe('MCP tools', () => {
+    const READ = 'mcp__github__search_issues';
+    const WRITE = 'mcp__github__create_issue';
+    const readOnly = new Set([READ]);
+
+    it('asks for every MCP tool by default', () => {
+      expect(isAutoApproved(READ, {}, off, none)).toBe(false);
+      expect(isAutoApproved(WRITE, {}, off, none)).toBe(false);
+    });
+
+    // The blanket setting is about this project's own edits and commands. An MCP server is
+    // third-party software reaching outside the workspace, so it must not inherit that trust.
+    it('is not covered by skipApprovalPrompts', () => {
+      const on = { ...off, skipApprovalPrompts: true, mcpReadOnlyTools: readOnly };
+      expect(isAutoApproved(READ, {}, on, none)).toBe(false);
+      expect(isAutoApproved(WRITE, {}, on, none)).toBe(false);
+    });
+
+    it('is not covered by autoApproveEdits or autoApproveSafeCommands', () => {
+      const on = { ...off, autoApproveEdits: true, autoApproveSafeCommands: true, mcpReadOnlyTools: readOnly };
+      expect(isAutoApproved(READ, {}, on, none)).toBe(false);
+      expect(isAutoApproved(WRITE, {}, on, none)).toBe(false);
+    });
+
+    it('is not covered by the user command patterns', () => {
+      const on = { ...off, autoApproveCommands: compileAnchoredPatterns(['.*']), mcpReadOnlyTools: readOnly };
+      expect(isAutoApproved(READ, {}, on, none)).toBe(false);
+    });
+
+    it('runs a read-hinted tool without asking only once the user opts in', () => {
+      const on = { ...off, autoApproveMcpReads: true, mcpReadOnlyTools: readOnly };
+      expect(isAutoApproved(READ, {}, on, none)).toBe(true);
+    });
+
+    // The hint comes from the server, so opting in must not extend to tools that never claimed it.
+    it('still asks for a tool the server did not mark read-only', () => {
+      const on = { ...off, autoApproveMcpReads: true, mcpReadOnlyTools: readOnly };
+      expect(isAutoApproved(WRITE, {}, on, none)).toBe(false);
+    });
+
+    it('asks when the opt-in is on but no hints are known', () => {
+      const on = { ...off, autoApproveMcpReads: true };
+      expect(isAutoApproved(READ, {}, on, none)).toBe(false);
+    });
+
+    it('honours "always allow" for this exact tool', () => {
+      expect(isAutoApproved(WRITE, {}, off, new Set([WRITE]))).toBe(true);
+      expect(isAutoApproved(READ, {}, off, new Set([WRITE]))).toBe(false);
+    });
+
+    // A built-in tool must never be treated as an MCP one, or it would skip its own rules.
+    it('does not mistake a built-in tool for an MCP tool', () => {
+      const on = { ...off, autoApproveMcpReads: true, mcpReadOnlyTools: new Set(['edit_file', 'run_command']) };
+      expect(isAutoApproved('edit_file', {}, on, none)).toBe(false);
+      expect(isAutoApproved('run_command', cmd('ls'), on, none)).toBe(false);
+    });
+  });
 });

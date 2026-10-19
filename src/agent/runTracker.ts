@@ -51,9 +51,12 @@ export class RunTracker {
     return [...this.unverified];
   }
 
-  /** Call after every tool call. The verdict says whether the loop should warn or stop. */
-  record(name: string, input: unknown, outcome: ToolOutcome, output: string): RepeatVerdict {
-    this.trackVerification(name, input, outcome, output);
+  /**
+   * Call after every tool call. `changed` lists the files it wrote, which for a sub-agent are the
+   * files the sub-agent changed. The verdict says whether the loop should warn or stop.
+   */
+  record(name: string, input: unknown, outcome: ToolOutcome, output: string, changed: string[] = []): RepeatVerdict {
+    this.trackVerification(name, input, outcome, output, changed);
     if (name === 'update_board') return 'ok';
 
     const signature = `${name}:${stable(input)}`;
@@ -68,8 +71,10 @@ export class RunTracker {
     return 'ok';
   }
 
-  private trackVerification(name: string, input: unknown, outcome: ToolOutcome, output: string): void {
+  private trackVerification(name: string, input: unknown, outcome: ToolOutcome, output: string, changed: string[]): void {
     if (outcome === 'rejected' && name === 'run_command') this.verificationDeclined = true;
+    // A sub-agent's changes need checking even if it then failed. Edits are tracked by their path below.
+    if (name !== 'edit_file' && name !== 'create_file') for (const file of changed) this.unverified.add(file);
     if (outcome !== 'ok') return;
     const path = (input as { path?: unknown } | null)?.path;
 

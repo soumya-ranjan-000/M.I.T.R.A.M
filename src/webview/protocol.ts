@@ -18,6 +18,39 @@ export interface Board {
 export type ToolStatus = 'pending' | 'running' | 'ok' | 'error' | 'rejected';
 export type ApprovalDecision = 'approve' | 'reject' | 'always';
 
+/** The tool that hands a task to a sub-agent. Its card shows the sub-agent's own tool calls. */
+export const SUBAGENT_TOOL = 'delegate_task';
+
+/** Connection state of one MCP server, as shown in the MCP panel. */
+export type McpStatusKind = 'idle' | 'connecting' | 'ready' | 'failed' | 'disabled';
+
+/**
+ * One MCP server, for the panel. Carries no API key: the key stays in the host's secret storage
+ * and `hasKey` only says whether one has been set.
+ */
+export interface McpServerView {
+  id: string;
+  status: McpStatusKind;
+  /** Why it failed, when it did. */
+  error?: string;
+  toolCount: number;
+  /** The command or URL, so the user can tell two servers apart. */
+  description: string;
+  /** This server authenticates with an API key. */
+  needsKey: boolean;
+  /** A key has been stored for it. */
+  hasKey: boolean;
+  enabled: boolean;
+}
+
+/** An entry in the "Add server" picker. */
+export interface McpPresetView {
+  id: string;
+  label: string;
+  description: string;
+  needsKey: boolean;
+}
+
 /** Images per message. */
 export const MAX_IMAGES = 5;
 /** Largest image we send, before base64 (5 MB once encoded, the API's limit per image). */
@@ -80,26 +113,35 @@ export interface RetrievedRef {
   endLine: number;
 }
 
+/** One tool call: the agent's own, or one a sub-agent made. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  summary: string;
+  detail?: string;
+  status: ToolStatus;
+  output?: string;
+  /**
+   * For a command awaiting approval: the rule "Always allow" would save, e.g. "npm test *".
+   * `usesShell` means the command has pipes, chaining and so on, so only this exact text is saved.
+   */
+  allowRule?: { label: string; usesShell: boolean };
+  /** A short label shown next to the summary, e.g. "read-only" on a sub-agent or "MCP". */
+  badge?: string;
+}
+
 export type DisplayMessage =
   | { role: 'user'; text: string; images?: ImageAttachment[]; files?: FileAttachment[] }
   /** Files the extension's own search attached to the message above, before the model ran. */
   | { role: 'retrieved'; files: RetrievedRef[] }
   | { role: 'assistant'; text: string }
   | { role: 'thinking'; text: string }
-  | {
-      role: 'tool';
-      id: string;
-      name: string;
-      summary: string;
-      detail?: string;
-      status: ToolStatus;
-      output?: string;
-      /**
-       * For a command awaiting approval: the rule "Always allow" would save, e.g. "npm test *".
-       * `usesShell` means the command has pipes, chaining and so on, so only this exact text is saved.
-       */
-      allowRule?: { label: string; usesShell: boolean };
-    };
+  | ({ role: 'tool' } & ToolCall & {
+      /** For a sub-agent: what it is waiting for, when that is not one of its own calls. */
+      note?: string;
+      /** For a sub-agent: the tool calls it has made, in order. */
+      steps?: ToolCall[];
+    });
 
 export interface SessionSummary {
   id: string;
@@ -137,6 +179,15 @@ export type WebviewToHost =
   | { type: 'continueRun' }
   | { type: 'managePermissions' }
   | { type: 'pickFiles' }
+  /** Open the MCP panel: the host replies with an `mcpStatus`. */
+  | { type: 'mcpRefresh' }
+  /** Start the "Add MCP server" wizard, which runs entirely in the host. */
+  | { type: 'mcpAdd' }
+  | { type: 'mcpRemove'; id: string }
+  | { type: 'mcpEnable'; id: string; enabled: boolean }
+  /** Ask the host to prompt for this server's API key. The key never passes through the webview. */
+  | { type: 'mcpSetKey'; id: string }
+  | { type: 'mcpRestart'; id?: string }
   /** file:// URIs copied or dragged from a file manager, for the host to read. */
   | { type: 'readFiles'; uris: string[] }
   /** A file dropped or pasted into the webview that is not an image: the host works out what it is. */
@@ -146,9 +197,12 @@ export type HostToWebview =
   | { type: 'streamDelta'; text: string }
   | { type: 'thinkingDelta'; text: string }
   | { type: 'streamEnd' }
-  | { type: 'toolStart'; id: string; name: string; summary: string; detail?: string; status: ToolStatus }
-  | { type: 'toolUpdate'; id: string; status: ToolStatus; output?: string }
-  | { type: 'toolAllowRule'; id: string; label: string; usesShell: boolean }
+  /** `parentId` is set for a sub-agent's call: the id of the delegate_task call that started it. */
+  | { type: 'toolStart'; id: string; name: string; summary: string; detail?: string; status: ToolStatus; badge?: string; parentId?: string }
+  | { type: 'toolUpdate'; id: string; status: ToolStatus; output?: string; parentId?: string }
+  | { type: 'toolAllowRule'; id: string; label: string; usesShell: boolean; parentId?: string }
+  /** Sets or clears (empty text) a sub-agent card's note. */
+  | { type: 'toolNote'; id: string; note: string }
   | { type: 'notice'; text: string }
   | { type: 'retrieved'; files: RetrievedRef[] }
   | { type: 'checkpoint'; files: string[] }
@@ -172,9 +226,26 @@ export type HostToWebview =
   /** Files the host read: images still to be resized by the webview, and files ready to attach. */
   | { type: 'attachmentsPicked'; images: RawImage[]; files: FileAttachment[] }
   | { type: 'sessions'; list: SessionSummary[]; activeId: string | null }
+  /** The configured MCP servers and their connection state, for the MCP panel. */
+  | { type: 'mcpStatus'; servers: McpServerView[]; presets: McpPresetView[]; problems: string[] }
   | { type: 'loadMessages'; messages: DisplayMessage[] };
 
-const NO_PAYLOAD = new Set(['ready', 'retry', 'stop', 'openSettings', 'setApiKey', 'newChat', 'revert', 'pickModel', 'clearBoard', 'continueRun', 'managePermissions', 'pickFiles']);
+const NO_PAYLOAD = new Set([
+  'ready',
+  'retry',
+  'stop',
+  'openSettings',
+  'setApiKey',
+  'newChat',
+  'revert',
+  'pickModel',
+  'clearBoard',
+  'continueRun',
+  'managePermissions',
+  'pickFiles',
+  'mcpRefresh',
+  'mcpAdd',
+]);
 const STRING_FIELD: Record<string, string> = {
   switchSession: 'id',
   deleteSession: 'id',
@@ -182,6 +253,8 @@ const STRING_FIELD: Record<string, string> = {
   copyCode: 'code',
   searchFiles: 'query',
   viewDiff: 'id',
+  mcpRemove: 'id',
+  mcpSetKey: 'id',
 };
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -269,6 +342,13 @@ export function isWebviewToHost(value: unknown): value is WebviewToHost {
   }
   if (v.type === 'approval') {
     return typeof v.id === 'string' && (v.decision === 'approve' || v.decision === 'reject' || v.decision === 'always');
+  }
+  if (v.type === 'mcpEnable') {
+    return typeof v.id === 'string' && typeof v.enabled === 'boolean';
+  }
+  if (v.type === 'mcpRestart') {
+    // No id means "reconnect everything".
+    return v.id === undefined || typeof v.id === 'string';
   }
   const field = STRING_FIELD[v.type];
   return field !== undefined && typeof v[field] === 'string';

@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import type { DisplayMessage } from '../../../src/webview/protocol';
+import type { ToolCall } from '../../../src/webview/protocol';
 import { postToHost } from '../vscode';
 import { Icon, IconName } from './Icon';
-
-type ToolMessage = Extract<DisplayMessage, { role: 'tool' }>;
 
 const TOOL_ICONS: Record<string, IconName> = {
   read_file: 'file',
@@ -16,7 +14,7 @@ const TOOL_ICONS: Record<string, IconName> = {
   run_command: 'terminal',
 };
 
-const STATUS_LABEL: Record<ToolMessage['status'], string> = {
+const STATUS_LABEL: Record<ToolCall['status'], string> = {
   pending: 'Waiting for your approval',
   running: 'Running',
   ok: 'Done',
@@ -24,7 +22,7 @@ const STATUS_LABEL: Record<ToolMessage['status'], string> = {
   rejected: 'Rejected',
 };
 
-function StatusIndicator({ status }: { status: ToolMessage['status'] }) {
+export function StatusIndicator({ status }: { status: ToolCall['status'] }) {
   const label = STATUS_LABEL[status];
   switch (status) {
     case 'running':
@@ -40,20 +38,23 @@ function StatusIndicator({ status }: { status: ToolMessage['status'] }) {
   }
 }
 
-export function ToolCard({ tool }: { tool: ToolMessage }) {
+export function ToolCard({ tool }: { tool: ToolCall }) {
   const decide = (decision: 'approve' | 'reject' | 'always') =>
     postToHost({ type: 'approval', id: tool.id, decision });
   const pending = tool.status === 'pending';
+  // Tools from an MCP server reach outside the workspace, so they are marked as such.
+  const isMcp = tool.name.startsWith('mcp__');
   const hasBody = !!tool.detail || !!tool.output;
   const [open, setOpen] = useState(false);
   const expandable = !pending && hasBody;
 
   const head = (
     <>
-      <Icon name={TOOL_ICONS[tool.name] ?? 'terminal'} size={14} />
+      <Icon name={isMcp ? 'plug' : (TOOL_ICONS[tool.name] ?? 'terminal')} size={14} />
       <span className="toolcard-summary" title={tool.summary}>
         {tool.summary}
       </span>
+      {tool.badge && <span className="toolcard-badge">{tool.badge}</span>}
       <StatusIndicator status={tool.status} />
       {expandable && (
         <span className={`chevron${open ? ' open' : ''}`}>

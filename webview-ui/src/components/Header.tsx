@@ -6,9 +6,13 @@ import { Icon } from './Icon';
 interface Props {
   sessions: SessionSummary[];
   activeId: string | null;
+  /** Opens the MCP servers panel. */
+  onOpenMcp: () => void;
+  /** How many MCP servers are connected, shown as a badge on the button. */
+  mcpConnected?: number;
 }
 
-export function Header({ sessions, activeId }: Props) {
+export function Header({ sessions, activeId, onOpenMcp, mcpConnected = 0 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const historyBtn = useRef<HTMLButtonElement>(null);
@@ -71,6 +75,15 @@ export function Header({ sessions, activeId }: Props) {
         aria-label="Delete this chat"
       >
         <Icon name="trash" size={16} />
+      </button>
+      <button
+        className={`icon-btn ${mcpConnected > 0 ? 'has-badge' : ''}`}
+        onClick={onOpenMcp}
+        title={mcpConnected > 0 ? `MCP servers (${mcpConnected} connected)` : 'MCP servers (/mcp)'}
+        aria-label="MCP servers"
+      >
+        <Icon name="plug" size={16} />
+        {mcpConnected > 0 && <span className="icon-badge">{mcpConnected}</span>}
       </button>
       <button className="icon-btn" onClick={() => postToHost({ type: 'openSettings' })} title="Settings" aria-label="Settings">
         <Icon name="settings" size={16} />

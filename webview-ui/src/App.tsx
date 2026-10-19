@@ -1,7 +1,16 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { describeActivity } from '../../src/webview/activity';
 import { applyHostEvent } from '../../src/webview/displayReducer';
-import type { Board, DisplayMessage, FileAttachment, ImageAttachment, SessionSummary } from '../../src/webview/protocol';
+import {
+  SUBAGENT_TOOL,
+  type Board,
+  type DisplayMessage,
+  type FileAttachment,
+  type ImageAttachment,
+  type McpPresetView,
+  type McpServerView,
+  type SessionSummary,
+} from '../../src/webview/protocol';
 import { emptyBoard } from '../../src/agent/board';
 import type { SlashCommand } from '../../src/webview/slashCommands';
 import { Avatar, MessageHeader } from './components/Avatar';
@@ -11,8 +20,10 @@ import { AgentState, Composer } from './components/Composer';
 import { Header } from './components/Header';
 import { Icon } from './components/Icon';
 import { Markdown } from './components/Markdown';
+import { McpPanel } from './components/McpPanel';
 import { PinnedRequest } from './components/PinnedRequest';
 import { RetrievedCard } from './components/RetrievedCard';
+import { SubagentCard } from './components/SubagentCard';
 import { ThinkingBlock } from './components/ThinkingBlock';
 import { ToolCard } from './components/ToolCard';
 import { Usage } from './components/UsageBar';
@@ -34,6 +45,13 @@ interface Budget {
   steps: number;
 }
 
+/** The MCP panel's data, as last sent by the host. */
+interface McpState {
+  servers: McpServerView[];
+  presets: McpPresetView[];
+  problems: string[];
+}
+
 const speaker = (m: DisplayMessage): 'user' | 'assistant' => (m.role === 'user' ? 'user' : 'assistant');
 
 export function App() {
@@ -53,6 +71,8 @@ export function App() {
   const [model, setModel] = useState('');
   const [board, setBoard] = useState<Board>(emptyBoard());
   const [budget, setBudget] = useState<Budget | null>(null);
+  const [mcp, setMcp] = useState<McpState | null>(null);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const planTurn = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -72,6 +92,7 @@ export function App() {
         case 'toolStart':
         case 'toolUpdate':
         case 'toolAllowRule':
+        case 'toolNote':
         case 'notice':
           setMessages((prev) => applyHostEvent(prev, msg));
           break;
@@ -122,6 +143,9 @@ export function App() {
           setActiveFile(msg.file);
           setHasSelection(msg.hasSelection);
           setHasWorkspace(msg.hasWorkspace);
+          break;
+        case 'mcpStatus':
+          setMcp({ servers: msg.servers, presets: msg.presets, problems: msg.problems });
           break;
       }
     });
@@ -246,7 +270,16 @@ export function App() {
       case 'permissions':
         postToHost({ type: 'managePermissions' });
         break;
+      case 'mcp':
+        openMcp();
+        break;
     }
+  }
+
+  /** Opens the MCP panel, asking the host for fresh server state as it opens. */
+  function openMcp() {
+    postToHost({ type: 'mcpRefresh' });
+    setMcpOpen(true);
   }
 
   function continueRun() {
@@ -269,7 +302,12 @@ export function App() {
 
   return (
     <div className="app">
-      <Header sessions={sessions} activeId={activeId} />
+      <Header
+        sessions={sessions}
+        activeId={activeId}
+        onOpenMcp={openMcp}
+        mcpConnected={mcp?.servers.filter((s) => s.status === 'ready').length ?? 0}
+      />
       {!hasWorkspace && (
         <div className="banner">
           No folder is open, so file and command tools are off. Open a folder (File → Open Folder) to let M.I.T.R.A.M edit
@@ -336,7 +374,7 @@ export function App() {
                   </div>
                 )}
                 {m.role === 'thinking' && <ThinkingBlock text={m.text} live={busy && m === messages[messages.length - 1]} />}
-                {m.role === 'tool' && <ToolCard tool={m} />}
+                {m.role === 'tool' && (m.name === SUBAGENT_TOOL ? <SubagentCard tool={m} /> : <ToolCard tool={m} />)}
                 {m.role === 'retrieved' && <RetrievedCard files={m.files} />}
               </Fragment>
             );
@@ -383,6 +421,14 @@ export function App() {
             <Icon name="send" size={13} /> Continue
           </button>
         </div>
+      )}
+      {mcpOpen && (
+        <McpPanel
+          servers={mcp?.servers ?? []}
+          presets={mcp?.presets ?? []}
+          problems={mcp?.problems ?? []}
+          onClose={() => setMcpOpen(false)}
+        />
       )}
       <BoardPanel board={board} busy={busy} />
       {changedFiles.length > 0 && !busy && (

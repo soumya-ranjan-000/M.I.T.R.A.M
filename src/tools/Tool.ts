@@ -25,11 +25,33 @@ export interface ToolContext {
   blockedCommandPatterns?: RegExp[];
   /** The agent's plan board for this chat. */
   board?: BoardAccess;
+  /** The id of the tool call being run. Set by the agent loop for each call. */
+  callId?: string;
+  /** Starts sub-agents for delegate_task. Not set where delegation is off, or inside a sub-agent. */
+  subagents?: SubagentRunner;
+}
+
+/** read-only: explore and report. implement: may also edit files and run commands. */
+export type SubagentMode = 'explore' | 'implement';
+
+export interface Delegation {
+  /** The delegate_task call this sub-agent belongs to; its card shows the sub-agent's calls. */
+  callId: string;
+  description: string;
+  prompt: string;
+  mode: SubagentMode;
+}
+
+export interface SubagentRunner {
+  /** Runs a sub-agent on the task and resolves with its final report. */
+  run(task: Delegation, ctx: ToolContext): Promise<string>;
 }
 
 export interface ToolPreview {
   summary: string;
   detail?: string;
+  /** A short label shown next to the summary on the card. */
+  badge?: string;
 }
 
 /** The result an edit would produce, computed without writing anything. */
@@ -81,6 +103,13 @@ export class ToolRegistry {
   readOnly(): ToolRegistry {
     const copy = new ToolRegistry();
     for (const tool of this.tools.values()) if (!tool.requiresApproval) copy.register(tool);
+    return copy;
+  }
+
+  /** A registry without the named tools. */
+  without(...names: string[]): ToolRegistry {
+    const copy = new ToolRegistry();
+    for (const tool of this.tools.values()) if (!names.includes(tool.name)) copy.register(tool);
     return copy;
   }
 

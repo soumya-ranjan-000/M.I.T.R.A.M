@@ -138,6 +138,51 @@ kbd {
   font-size: 0.92em; color: var(--vscode-descriptionForeground);
 }
 
+.toolcard-badge {
+  flex-shrink: 0; padding: 0 5px; border-radius: 6px; font-size: 0.7em; letter-spacing: 0.03em; text-transform: uppercase;
+  background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); opacity: 0.85;
+}
+
+/* ---------- MCP servers panel ---------- */
+.icon-btn.has-badge { position: relative; }
+.icon-badge {
+  position: absolute; top: 1px; right: 1px; min-width: 13px; padding: 0 3px; font-size: 0.65em; line-height: 13px; text-align: center;
+  border-radius: 7px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground);
+}
+.mcp-backdrop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-start; justify-content: center; padding: 10vh 12px 12px; background: rgba(0,0,0,0.35); }
+.mcp-panel {
+  display: flex; flex-direction: column; width: 100%; max-width: 520px; max-height: 76vh; overflow: hidden;
+  background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-panel-border); border-radius: 10px;
+  box-shadow: 0 6px 20px var(--vscode-widget-shadow, rgba(0,0,0,0.4));
+}
+.mcp-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 10px 12px; border-bottom: 1px solid var(--vscode-panel-border); }
+.mcp-title { flex: 1; font-weight: 600; }
+.mcp-problems { margin: 0; padding: 8px 12px; list-style: none; font-size: 0.85em; border-bottom: 1px solid var(--vscode-panel-border); background: var(--vscode-inputValidation-warningBackground); }
+.mcp-problems li { display: flex; align-items: flex-start; gap: 6px; }
+.mcp-list { margin: 0; padding: 6px; list-style: none; overflow-y: auto; }
+.mcp-item { padding: 8px 8px 10px; border-radius: 8px; }
+.mcp-item + .mcp-item { margin-top: 2px; border-top: 1px solid var(--vscode-panel-border); }
+.mcp-item.disabled { opacity: 0.6; }
+.mcp-item-head { display: flex; align-items: center; gap: 7px; }
+.mcp-name { font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mcp-summary { margin-left: auto; font-size: 0.85em; opacity: 0.75; flex-shrink: 0; }
+.mcp-item.failed .mcp-summary { color: var(--vscode-errorForeground); opacity: 1; }
+.mcp-item-desc { margin: 2px 0 0 17px; font-size: 0.82em; opacity: 0.6; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--vscode-editor-font-family); }
+.mcp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--vscode-descriptionForeground); }
+.mcp-dot.ready { background: var(--vscode-testing-iconPassed, #3fb950); }
+.mcp-dot.failed { background: var(--vscode-testing-iconFailed, #f85149); }
+.mcp-dot.connecting { background: var(--vscode-charts-yellow, #cca700); }
+.mcp-dot.disabled { background: transparent; border: 1px solid var(--vscode-descriptionForeground); }
+.mcp-actions { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 0 17px; }
+.mcp-actions button { padding: 3px 8px; font-size: 0.85em; }
+.mcp-actions .mcp-remove:hover:not(:disabled) { background: var(--vscode-inputValidation-errorBackground); }
+.mcp-empty { padding: 18px 16px; text-align: center; }
+.mcp-empty p { margin: 0 0 12px; opacity: 0.8; }
+.mcp-suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 12px; }
+.mcp-suggestion { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; }
+.mcp-chip { padding: 0 5px; border-radius: 6px; font-size: 0.85em; opacity: 0.7; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.mcp-foot { padding: 8px 12px; font-size: 0.8em; opacity: 0.65; border-top: 1px solid var(--vscode-panel-border); }
+
 /* ---------- Bars above the composer ---------- */
 .notice-bar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0 var(--pad) 8px; padding: 8px 10px;
@@ -306,6 +351,29 @@ code.inline { font-family: var(--vscode-editor-font-family); background: var(--v
   color: var(--vscode-editorWarning-foreground, var(--vscode-errorForeground));
 }
 .toolcard-warning svg { flex-shrink: 0; margin-top: 2px; }
+.toolcard-badge {
+  flex-shrink: 0; padding: 0 6px; border-radius: 8px; font-size: 0.8em; line-height: 1.6;
+  color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border);
+}
+
+/* ---------- Sub-agents ---------- */
+.toolcard.subagent.waiting { border-color: var(--vscode-focusBorder); }
+.subagent-count { flex-shrink: 0; font-size: 0.85em; color: var(--vscode-descriptionForeground); }
+.subagent-activity {
+  margin: 3px 0 0 22px; font-size: 0.88em; color: var(--vscode-descriptionForeground);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.subagent-body { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.subagent-body .subagent-activity { margin-left: 0; }
+.subagent-label {
+  margin-top: 4px; font-size: 0.8em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+.subagent-steps { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.subagent-body .subagent-steps { margin-top: 0; }
+.subagent-steps .toolcard { font-size: 0.92em; background: transparent; }
+.subagent-report { max-height: 320px; overflow: auto; padding: 2px 8px; border-left: 2px solid var(--vscode-panel-border); }
+
 .actions .always-rule { min-width: 0; max-width: 100%; white-space: nowrap; }
 .actions .always-rule code { font-family: var(--vscode-editor-font-family); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { .dots i, .spinner { animation-duration: 3s; } .chevron { transition: none; } }

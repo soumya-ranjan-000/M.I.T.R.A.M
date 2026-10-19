@@ -144,25 +144,42 @@ M.I.T.R.A.M/
 Connect to user-configured MCP servers and expose their tools to the agent loop as ordinary
 `Tool` objects. Full design, file layout and risks: **[`docs/mcp-plan.md`](docs/mcp-plan.md)**.
 
-- [ ] **7.0** Add `@modelcontextprotocol/sdk` to `dependencies`; confirm esbuild bundles it for `node20` with no dynamic-require warnings before building on it.
-- [ ] **7.1** `mitram.mcpServers` setting (scope `application`) + `src/mcp/config.ts`: validate entries, `${env:NAME}` expansion, secrets via `SecretStore`.
-- [ ] **7.2** `McpClient`: connect (stdio + streamable HTTP) with timeouts, `listTools`, `callTool`, status, `close()`.
-- [ ] **7.3** `mcpTool.ts`: wrap an MCP tool as a `Tool` (`mcp__<server>__<tool>`, args in the preview, text flattening, truncation, server errors → `is_error`).
-- [ ] **7.4** `McpManager`: lifecycle, parallel lazy connect, restart on settings change, dispose kills every child process.
-- [ ] **7.5** `createRegistry(mcp)` (async) used by `ChatViewProvider.run()`; cap total MCP tools; plan mode still filters them out.
-- [ ] **7.6** Safety: per-workspace trust prompt, `isAutoApproved` branch for `mcp__…`, `mitram.blockedMcpTools`, untrusted-output line in the system prompt, argument-free logging.
-- [ ] **7.7** UI: MCP badge on tool cards, server status + Reconnect, `/mcp` slash command, protocol validators and tests.
-- [ ] **7.8** README + CHANGELOG + one eval task driving a trivial local stdio server.
+- [x] **7.0** Add `@modelcontextprotocol/sdk` to `dependencies`; confirm esbuild bundles it for `node20` with no dynamic-require warnings before building on it.
+- [x] **7.1** `mitram.mcpServers` setting (scope `application`) + `src/mcp/config.ts`: validate entries, `${env:NAME}` expansion, secrets via `SecretStore`.
+- [x] **7.2** `McpClient`: connect (stdio, streamable HTTP **and SSE**) with timeouts, `listTools`, `callTool`, status, `close()`.
+- [x] **7.3** `mcpTool.ts`: wrap an MCP tool as a `Tool` (`mcp__<server>__<tool>`, args in the preview, text flattening, truncation, server errors → `is_error`).
+- [x] **7.4** `McpManager`: lifecycle, parallel lazy connect, restart on settings change, dispose kills every child process.
+- [x] **7.5** `createRegistry(mcp)` (async) used by `ChatViewProvider.run()`; cap total MCP tools; plan mode still filters them out.
+- [x] **7.6** Safety: per-workspace trust prompt, `isAutoApproved` branch for `mcp__…`, `mitram.blockedMcpTools`, untrusted-output line in the system prompt, argument-free logging.
+- [x] **7.7** UI: MCP badge on tool cards, server status + Reconnect, `/mcp` slash command, protocol validators and tests.
+- [x] **7.8** README + CHANGELOG + smoke tests driving real spawned servers (`npm run smoke:mcp`, `npm run smoke:mcp:playwright`).
+- [x] **7.9** _(added)_ **MCP servers panel** in the chat view — add, remove, enable, set an API key, reconnect — with the add wizard and key prompt in the extension host, plus a preset catalogue (Playwright, GitHub, Filesystem, Atlassian, PostgreSQL, Sentry).
 
-**Done when:** a configured server's tool runs end to end behind an approval gate, a failing server
+**Done:** a configured server's tool runs end to end behind an approval gate, a failing server
 never breaks a run, no child process survives `deactivate()`, and with zero servers configured
-nothing about today's behaviour changes.
+nothing about today's behaviour changes. Verified by 147 unit tests plus two smoke tests against
+real spawned servers (a local stdio server and `@playwright/mcp`, 25 tools).
+
+## Phase 8: Sub-agents
+
+Hand a self-contained piece of work to a sub-agent with its own context, tools and brief, so a
+long investigation does not fill the main conversation. Only the final report comes back.
+
+- [x] **8.1** `delegate_task` tool: validated input, `explore` / `implement` modes, preview badge saying whether the sub-agent can change anything.
+- [x] **8.2** `subagents.ts`: a `Slots` semaphore for parallelism (`mitram.maxParallelSubagents`, 3 by default), releasing its slot on failure and on abort.
+- [x] **8.3** Tool scoping: `subagentTools()` gives `explore` read-only tools only, and never hands any sub-agent the plan board or `delegate_task` itself, so work cannot fan out without end.
+- [x] **8.4** `buildSubagentPrompt()`: a brief-only history, no knowledge of the main conversation, and a report as the final reply.
+- [x] **8.5** UI: nested tool cards indented under the delegation card, with a queued note while a sub-agent waits for a slot.
+- [x] **8.6** Settings `mitram.subagents` and `mitram.maxParallelSubagents`; plan mode offers `explore` only.
+- [x] **8.7** 34 unit tests covering concurrency, slot release on throw and abort, tool filtering, input validation and report assembly.
+
+**Done:** sub-agents run in parallel behind the same approval gates as the main agent, cannot
+recurse or touch the board, and are told to be verified rather than trusted.
 
 ## Post-MVP backlog (don't touch before Phase 5 is done)
 
 - More providers (OpenAI-compatible, Ollama), via `ModelProvider`
 - MCP resources and prompts; M.I.T.R.A.M **as** an MCP server (see `docs/mcp-plan.md`, "Later")
-- Sub-agents / parallel tasks
 - Embedding-based code search
 - Ghost-text inline completion (previously cut from MVP)
 

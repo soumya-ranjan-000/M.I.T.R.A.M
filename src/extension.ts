@@ -2,7 +2,12 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { INSTRUCTIONS_FILE, INSTRUCTIONS_TEMPLATE } from './agent/projectInstructions';
 import { Logger, buildDiagnostics } from './logging';
+import { McpConfigStore } from './mcp/McpConfigStore';
+import { McpManager } from './mcp/McpManager';
+import { McpServerConfig, describeServer } from './mcp/config';
+import { compileAnchoredPatterns } from './safety/commandPolicy';
 import { CommandRuleStore } from './storage/commandRules';
+import { McpTrustStore } from './storage/mcpTrust';
 import { SecretStore } from './storage/secrets';
 import { readSettings } from './storage/settings';
 import { SessionStore } from './storage/sessions';
@@ -19,7 +24,23 @@ export function activate(context: vscode.ExtensionContext): void {
   const proposals = new ProposalContentProvider();
   // "Always allow" command rules are per project, like chats.
   const commandRules = new CommandRuleStore(context.workspaceState);
-  const chat = new ChatViewProvider(
+  // Running an MCP server means running a program, so trust is per project too.
+  const mcpTrust = new McpTrustStore(context.workspaceState);
+  const mcpConfig = new McpConfigStore();
+  // Declared before the manager because its onChange closes over it, and assigned just below.
+  // The optional call matters: a status change during construction would otherwise be a
+  // temporal dead zone error, which activation reports as the whole extension failing to load.
+  let chat: ChatViewProvider | undefined;
+  const mcp = new McpManager({
+    servers: () => readSettings().mcpServers,
+    getApiKey: (id) => Promise.resolve(secrets.getMcpKey(id)),
+    blocked: () => compileAnchoredPatterns(readSettings().blockedMcpTools),
+    toolLimit: () => readSettings().mcpToolLimit,
+    confirmTrust: (servers) => confirmMcpTrust(servers, mcpTrust, logger),
+    log: (message) => logger.info(message),
+    onChange: () => chat?.refreshMcpPanel(),
+  });
+  chat = new ChatViewProvider(
     context.extensionUri,
     secrets,
     sessions,
@@ -28,6 +49,9 @@ export function activate(context: vscode.ExtensionContext): void {
     commandRules,
     logger,
     context.subscriptions,
+    mcp,
+    mcpConfig,
+    mcpTrust,
   );
 
   context.subscriptions.push(
@@ -54,6 +78,16 @@ export function activate(context: vscode.ExtensionContext): void {
           autoApproveSafeCommands: s.autoApproveSafeCommands,
           autoApproveCommands: s.autoApproveCommands.length,
           blockedCommandPatterns: s.blockedCommandPatterns.length,
+          subagents: s.subagents,
+          maxParallelSubagents: s.maxParallelSubagents,
+          // Counts only: a server's command or URL can name an internal host.
+          mcpServers: s.mcpServers.length,
+          mcpServersEnabled: s.mcpServers.filter((server) => server.enabled).length,
+          mcpServersConnected: mcp.status().filter((server) => server.status === 'ready').length,
+          mcpToolsOffered: mcp.tools().length,
+          mcpProblems: s.mcpProblems.length,
+          blockedMcpTools: s.blockedMcpTools.length,
+          autoApproveMcpReads: s.autoApproveMcpReads,
         },
       });
       await vscode.env.clipboard.writeText(text);
@@ -94,7 +128,47 @@ export function activate(context: vscode.ExtensionContext): void {
       await secrets.clearApiKey();
       void vscode.window.showInformationMessage('M.I.T.R.A.M: API key removed.');
     }),
+    // Kills every MCP child process when the window closes or the extension is disabled.
+    { dispose: () => void mcp.dispose() },
   );
+}
+
+/**
+ * Asks once per workspace before any MCP server is started.
+ *
+ * A server is an arbitrary program launched with the user's own permissions, so this is a real
+ * consent step, not a notification. The answer is remembered per project; "Not now" is not
+ * remembered, so the next run asks again.
+ */
+async function confirmMcpTrust(servers: McpServerConfig[], trust: McpTrustStore, logger: Logger): Promise<boolean> {
+  const saved = trust.get();
+  if (saved !== undefined) return saved;
+
+  const names = servers.map((s) => s.id).join(', ');
+  const detail = servers.map((s) => `• ${s.id} — ${describeServer(s)}`).join('\n');
+  const choice = await vscode.window.showWarningMessage(
+    `Start ${servers.length} MCP server${servers.length === 1 ? '' : 's'} for this project?`,
+    {
+      modal: true,
+      detail: `${detail}\n\nEach runs as a program with your permissions and can use its tools on your behalf. Only continue if you trust them.`,
+    },
+    'Start servers',
+    'Never for this project',
+  );
+
+  if (choice === 'Start servers') {
+    await trust.set(true);
+    logger.info(`mcp: trusted for this workspace (${names})`);
+    return true;
+  }
+  if (choice === 'Never for this project') {
+    await trust.set(false);
+    logger.info('mcp: refused for this workspace');
+    return false;
+  }
+  // Dismissed: do not start anything, but ask again next time.
+  logger.info('mcp: trust prompt dismissed; not starting servers');
+  return false;
 }
 
 export function deactivate(): void {}
