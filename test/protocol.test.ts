@@ -9,7 +9,7 @@ describe('isWebviewToHost', () => {
     expect(
       isWebviewToHost({ type: 'sendMessage', text: 'hi', includeActive: true, mentions: ['a.ts'], plan: false, images: [], files: [] }),
     ).toBe(true);
-    for (const type of ['retry', 'stop', 'openSettings', 'setApiKey', 'newChat', 'revert', 'pickModel', 'managePermissions', 'pickFiles']) {
+    for (const type of ['retry', 'stop', 'openSettings', 'setApiKey', 'newChat', 'revert', 'pickModel', 'managePermissions', 'pickFiles', 'voiceStart', 'voiceCancel']) {
       expect(isWebviewToHost({ type })).toBe(true);
     }
     expect(isWebviewToHost({ type: 'switchSession', id: 'x' })).toBe(true);
@@ -17,12 +17,15 @@ describe('isWebviewToHost', () => {
     expect(isWebviewToHost({ type: 'insertCode', code: 'x' })).toBe(true);
     expect(isWebviewToHost({ type: 'approval', id: 't', decision: 'always' })).toBe(true);
     expect(isWebviewToHost({ type: 'openFile', path: 'src/a.ts', line: 12 })).toBe(true);
+    expect(isWebviewToHost({ type: 'viewChange', id: 'toolu_1' })).toBe(true);
   });
 
   it('rejects malformed input', () => {
     expect(isWebviewToHost(null)).toBe(false);
     expect(isWebviewToHost('ready')).toBe(false);
     expect(isWebviewToHost({ type: 'nope' })).toBe(false);
+    expect(isWebviewToHost({ type: 'viewChange' })).toBe(false);
+    expect(isWebviewToHost({ type: 'viewChange', id: 5 })).toBe(false);
     expect(isWebviewToHost({ type: 'sendMessage', text: 'hi' })).toBe(false);
     expect(isWebviewToHost({ type: 'sendMessage', text: 'hi', includeActive: true, mentions: [] })).toBe(false);
     expect(isWebviewToHost({ type: 'sendMessage', text: 'hi', includeActive: true, mentions: [1], plan: false })).toBe(false);

@@ -120,13 +120,35 @@ export class SessionStore {
     await this.flush();
   }
 
+  /**
+   * Serialised sessions by id. Only the chat that was just saved changes between writes, but turning
+   * all fifty into JSON each time blocks the extension host (shared with every other extension) for
+   * long enough to be felt on big chats, so unchanged ones reuse their text.
+   */
+  private readonly serialized = new Map<string, { updatedAt: number; keep: number; json: string }>();
+  private writing: Promise<void> = Promise.resolve();
+
   private async flush(): Promise<void> {
     const recent = new Set(this.list().slice(0, KEEP_IMAGE_SESSIONS).map((s) => s.id));
-    const data: Persisted = {
-      ...this.data,
-      sessions: this.data.sessions.map((s) => forStorage(s, recent.has(s.id) ? KEEP_IMAGE_MESSAGES : 0)),
-    };
-    await fs.mkdir(path.dirname(this.file), { recursive: true });
-    await fs.writeFile(this.file, JSON.stringify(data));
+    const live = new Set<string>();
+    const sessions = this.data.sessions.map((s) => {
+      live.add(s.id);
+      const keep = recent.has(s.id) ? KEEP_IMAGE_MESSAGES : 0;
+      const cached = this.serialized.get(s.id);
+      if (cached && cached.updatedAt === s.updatedAt && cached.keep === keep) return cached.json;
+      const json = JSON.stringify(forStorage(s, keep));
+      this.serialized.set(s.id, { updatedAt: s.updatedAt, keep, json });
+      return json;
+    });
+    for (const id of this.serialized.keys()) if (!live.has(id)) this.serialized.delete(id);
+
+    const text = `{"activeId":${JSON.stringify(this.data.activeId)},"sessions":[${sessions.join(',')}]}`;
+    // One write at a time, so two saves close together cannot interleave and corrupt the file.
+    const write = this.writing.then(async () => {
+      await fs.mkdir(path.dirname(this.file), { recursive: true });
+      await fs.writeFile(this.file, text);
+    });
+    this.writing = write.catch(() => undefined);
+    await write;
   }
 }

@@ -72,6 +72,40 @@ function setup(turns: Turn[], over: Partial<AgentOptions> = {}, summaryText?: st
   return { provider, events, history, options, ac };
 }
 
+describe('runAgent file changes', () => {
+  it('reports what each edit and creation changed, keyed by the tool call', async () => {
+    await fs.writeFile(path.join(tmp, 'diffme.txt'), 'one two');
+    const changes: { callId: string; abs: string; before: string | null; after: string }[] = [];
+    const { options } = setup(
+      [
+        [
+          use('e1', 'edit_file', { path: 'diffme.txt', old_string: 'two', new_string: '2' }),
+          use('c1', 'create_file', { path: 'made/new.txt', content: 'fresh' }),
+          stop('tool_use'),
+        ],
+        [stop('end_turn')],
+      ],
+      { onFileChange: (c) => changes.push(c) },
+    );
+    await runAgent(options);
+
+    const edit = changes.find((c) => c.callId === 'e1');
+    const create = changes.find((c) => c.callId === 'c1');
+    expect(edit).toMatchObject({ abs: path.join(tmp, 'diffme.txt'), before: 'one two', after: 'one 2' });
+    expect(create).toMatchObject({ abs: path.join(tmp, 'made', 'new.txt'), before: null, after: 'fresh' });
+  });
+
+  it('reports nothing for a rejected edit', async () => {
+    const changes: unknown[] = [];
+    const { options } = setup(
+      [[use('e2', 'edit_file', { path: 'a.txt', old_string: 'hello', new_string: 'bye' }), stop('tool_use')], [stop('end_turn')]],
+      { onFileChange: (c) => changes.push(c), requestApproval: async () => 'reject' },
+    );
+    await runAgent(options);
+    expect(changes).toEqual([]);
+  });
+});
+
 describe('runAgent', () => {
   it('runs a tool and feeds the result back to the model', async () => {
     const { options, history, events, provider } = setup([

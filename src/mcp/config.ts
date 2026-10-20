@@ -6,9 +6,14 @@
  * VS Code's SecretStorage under `mitram.mcpSecret.<id>` and is injected at connect time.
  */
 export interface McpAuth {
-  /** `header` for remote servers (HTTP header), `env` for local ones (child process variable). */
-  kind: 'header' | 'env';
-  /** Header name (`Authorization`) or environment variable name (`GITHUB_TOKEN`). */
+  /**
+   * `header` for remote servers (HTTP header), `env` for local ones (child process variable), and
+   * `oauth` for a remote server that signs the user in through their browser (OAuth 2.1 with PKCE
+   * and dynamic client registration). With `oauth` there is no key to type: the tokens are obtained
+   * and refreshed by the client, and kept in secret storage.
+   */
+  kind: 'header' | 'env' | 'oauth';
+  /** Header name (`Authorization`) or environment variable name (`GITHUB_TOKEN`). Empty for `oauth`. */
   name: string;
   /** Template for the value, with `{key}` replaced by the secret. Defaults to `{key}`. */
   format: string;
@@ -82,15 +87,23 @@ function readStringMap(
 }
 
 function readAuth(raw: unknown, id: string, transport: McpTransport, problems: string[]): McpAuth | undefined {
+  const problem = (text: string) => problems.push(text);
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) {
     problems.push(`"${id}": "auth" must be an object; ignored.`);
     return undefined;
   }
   const kind = raw.kind ?? (transport === 'stdio' ? 'env' : 'header');
-  if (kind !== 'header' && kind !== 'env') {
-    problems.push(`"${id}": "auth.kind" must be "header" or "env"; ignored.`);
+  if (kind !== 'header' && kind !== 'env' && kind !== 'oauth') {
+    problems.push(`"${id}": "auth.kind" must be "header", "env" or "oauth"; ignored.`);
     return undefined;
+  }
+  if (kind === 'oauth') {
+    if (transport === 'stdio') {
+      problem(`"${id}": "auth.kind": "oauth" is for remote servers (a "url"), not a local command; ignored.`);
+      return undefined;
+    }
+    return { kind, name: '', format: '{key}' };
   }
   if (typeof raw.name !== 'string' || !raw.name.trim()) {
     problems.push(`"${id}": "auth.name" is required (the header or variable name); ignored.`);

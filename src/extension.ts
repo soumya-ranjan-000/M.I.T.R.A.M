@@ -36,6 +36,20 @@ export function activate(context: vscode.ExtensionContext): void {
     getApiKey: (id) => Promise.resolve(secrets.getMcpKey(id)),
     blocked: () => compileAnchoredPatterns(readSettings().blockedMcpTools),
     toolLimit: () => readSettings().mcpToolLimit,
+    oauth: {
+      store: (id) => ({
+        load: () => Promise.resolve(secrets.getMcpOAuth(id)),
+        save: (json) => Promise.resolve(secrets.setMcpOAuth(id, json)),
+        clear: () => Promise.resolve(secrets.clearMcpOAuth(id)),
+      }),
+      openBrowser: async (url) => {
+        await vscode.env.openExternal(vscode.Uri.parse(url, true));
+      },
+      // A remote window forwards the port, so the browser on this machine can reach the redirect.
+      externalRedirect: vscode.env.remoteName
+        ? async (url) => (await vscode.env.asExternalUri(vscode.Uri.parse(url))).toString(true)
+        : undefined,
+    },
     confirmTrust: (servers) => confirmMcpTrust(servers, mcpTrust, logger),
     log: (message) => logger.info(message),
     onChange: () => chat?.refreshMcpPanel(),
@@ -123,6 +137,22 @@ export function activate(context: vscode.ExtensionContext): void {
         await vscode.workspace.fs.writeFile(file, Buffer.from(INSTRUCTIONS_TEMPLATE, 'utf8'));
       }
       await vscode.window.showTextDocument(file);
+    }),
+    vscode.commands.registerCommand('mitram.setVoiceApiKey', async () => {
+      const key = await vscode.window.showInputBox({
+        title: 'M.I.T.R.A.M: Voice Transcription API Key',
+        prompt: 'For the endpoint in mitram.voice.endpoint. Stored securely in VS Code SecretStorage.',
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (key?.trim()) {
+        await secrets.setVoiceKey(key.trim());
+        void vscode.window.showInformationMessage('M.I.T.R.A.M: Voice API key saved.');
+      }
+    }),
+    vscode.commands.registerCommand('mitram.clearVoiceApiKey', async () => {
+      await secrets.clearVoiceKey();
+      void vscode.window.showInformationMessage('M.I.T.R.A.M: Voice API key removed.');
     }),
     vscode.commands.registerCommand('mitram.clearApiKey', async () => {
       await secrets.clearApiKey();

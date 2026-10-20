@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type { ToolCall } from '../../../src/webview/protocol';
 import { postToHost } from '../vscode';
 import { Icon, IconName } from './Icon';
@@ -38,7 +38,7 @@ export function StatusIndicator({ status }: { status: ToolCall['status'] }) {
   }
 }
 
-export function ToolCard({ tool }: { tool: ToolCall }) {
+export const ToolCard = memo(function ToolCard({ tool }: { tool: ToolCall }) {
   const decide = (decision: 'approve' | 'reject' | 'always') =>
     postToHost({ type: 'approval', id: tool.id, decision });
   const pending = tool.status === 'pending';
@@ -47,6 +47,9 @@ export function ToolCard({ tool }: { tool: ToolCall }) {
   const hasBody = !!tool.detail || !!tool.output;
   const [open, setOpen] = useState(false);
   const expandable = !pending && hasBody;
+  // A finished edit opens as a diff when its card is clicked.
+  const changed = tool.status === 'ok' && (tool.name === 'edit_file' || tool.name === 'create_file');
+  const viewChange = () => postToHost({ type: 'viewChange', id: tool.id });
 
   const head = (
     <>
@@ -56,7 +59,7 @@ export function ToolCard({ tool }: { tool: ToolCall }) {
       </span>
       {tool.badge && <span className="toolcard-badge">{tool.badge}</span>}
       <StatusIndicator status={tool.status} />
-      {expandable && (
+      {expandable && !changed && (
         <span className={`chevron${open ? ' open' : ''}`}>
           <Icon name="chevron" size={12} />
         </span>
@@ -66,7 +69,29 @@ export function ToolCard({ tool }: { tool: ToolCall }) {
 
   return (
     <div className={`toolcard ${tool.status}`} role="group" aria-label={`${tool.summary}: ${STATUS_LABEL[tool.status]}`}>
-      {expandable ? (
+      {changed ? (
+        <div className="toolcard-head split">
+          <button className="toolcard-main" onClick={viewChange} title="Open the diff of this change" aria-label={`${tool.summary}: view diff`}>
+            {head}
+            <span className="toolcard-diff-hint">
+              <Icon name="diff" size={13} /> View diff
+            </span>
+          </button>
+          {expandable && (
+            <button
+              className="icon-btn small"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              aria-label={open ? 'Hide details' : 'Show details'}
+              title={open ? 'Hide details' : 'Show details'}
+            >
+              <span className={`chevron${open ? ' open' : ''}`}>
+                <Icon name="chevron" size={12} />
+              </span>
+            </button>
+          )}
+        </div>
+      ) : expandable ? (
         <button className="toolcard-head clickable" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           {head}
         </button>
@@ -130,4 +155,4 @@ export function ToolCard({ tool }: { tool: ToolCall }) {
       )}
     </div>
   );
-}
+});

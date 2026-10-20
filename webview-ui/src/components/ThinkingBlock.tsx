@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Icon } from './Icon';
 
 /** The model's reasoning summary. Open while it is streaming, then folds itself away. */
-export function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
+export const ThinkingBlock = memo(function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
   const [open, setOpen] = useState(live);
   useEffect(() => {
     if (!live) setOpen(false);
@@ -20,4 +20,4 @@ export function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
       {open && <div className="thinking-body">{text}</div>}
     </div>
   );
-}
+});

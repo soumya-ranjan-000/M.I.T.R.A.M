@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import type { ChatMessage, ModelProvider } from '../providers/ModelProvider';
 import { SubagentMode, SubagentRunner, Tool, ToolRegistry } from '../tools/Tool';
 import { SUBAGENT_TOOL, type ApprovalDecision } from '../webview/protocol';
-import { AgentEvent, ApprovalRequest, recordWrites, runAgent } from './AgentLoop';
+import { AgentEvent, ApprovalRequest, FileChange, recordWrites, runAgent } from './AgentLoop';
 
 export interface SubagentDeps {
   provider: ModelProvider;
@@ -20,6 +20,8 @@ export interface SubagentDeps {
   onEvent: (parentId: string, event: AgentEvent) => void;
   /** Sets the note on that sub-agent's card, or clears it with ''. */
   onNote: (parentId: string, note: string) => void;
+  /** A file a sub-agent wrote, so its card in the chat can show the change. */
+  onFileChange?: (change: FileChange) => void;
   isAutoApproved?: (tool: Tool, input: unknown) => boolean;
   requestApproval: (request: ApprovalRequest, parentId: string) => Promise<ApprovalDecision>;
   log?: (message: string) => void;
@@ -144,6 +146,7 @@ export function createSubagentRunner(deps: SubagentDeps): SubagentRunner {
             if (event.type === 'tool_start') calls++;
             deps.onEvent(task.callId, event);
           },
+          onFileChange: deps.onFileChange,
           isAutoApproved: deps.isAutoApproved,
           requestApproval: (request) => deps.requestApproval(request, task.callId),
           exclusive: (fn) => {

@@ -16,6 +16,8 @@ describe('security-sensitive settings', () => {
     'mitram.autoApproveCommands',
     'mitram.mcpServers',
     'mitram.autoApproveMcpReads',
+    // Audio from the microphone must not be redirected by a cloned repository.
+    'mitram.voice.endpoint',
   ])('%s is read from user settings only', (key) => expect(properties[key]?.scope).toBe('application'));
 
   // The key itself belongs in SecretStorage, so the schema must not invite one into settings.json.

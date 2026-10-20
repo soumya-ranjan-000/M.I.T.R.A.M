@@ -21,6 +21,15 @@ export type AgentEvent =
   | { type: 'budget'; reason: 'steps' | 'time' | 'stuck'; steps: number }
   | { type: 'usage'; usage: Usage };
 
+/** A file one tool call wrote: what it held before (null if it did not exist) and what it holds now. */
+export interface FileChange {
+  /** The tool call that made the change. */
+  callId: string;
+  abs: string;
+  before: string | null;
+  after: string;
+}
+
 export interface ApprovalRequest {
   id: string;
   tool: Tool;
@@ -50,6 +59,8 @@ export interface AgentOptions {
   /** Clock, replaceable in tests. */
   now?: () => number;
   onEvent: (event: AgentEvent) => void;
+  /** Called after each file write, so the chat can show what the call changed. */
+  onFileChange?: (change: FileChange) => void;
   /** Return true to run a tool that normally needs approval without asking. */
   isAutoApproved?: (tool: Tool, input: unknown) => boolean;
   requestApproval: (request: ApprovalRequest) => Promise<ApprovalDecision>;
@@ -242,6 +253,20 @@ export function recordWrites(inner: FilePort, into: Set<string>): FilePort {
   };
 }
 
+/** Like {@link recordWrites}, and also reports what each write replaced. */
+function reportWrites(inner: FilePort, into: Set<string>, callId: string, report?: (change: FileChange) => void): FilePort {
+  if (!report) return recordWrites(inner, into);
+  return {
+    ...inner,
+    async writeText(abs, content) {
+      const before = (await inner.exists(abs)) ? await inner.readText(abs) : null;
+      await inner.writeText(abs, content);
+      into.add(abs);
+      report({ callId, abs, before, after: content });
+    },
+  };
+}
+
 const runDirectly = <T>(fn: () => Promise<T>): Promise<T> => fn();
 
 function finished(id: string, content: string, outcome: ToolOutcome): ToolRun {
@@ -258,7 +283,7 @@ async function executeTool(use: ToolUse, options: AgentOptions): Promise<ToolRun
   }
 
   const written = new Set<string>();
-  const ctx: ToolContext = { ...options.ctx, callId: use.id, files: recordWrites(options.ctx.files, written) };
+  const ctx: ToolContext = { ...options.ctx, callId: use.id, files: reportWrites(options.ctx.files, written, use.id, options.onFileChange) };
 
   let preview: ToolPreview = { summary: tool.name };
   try {
