@@ -4,14 +4,16 @@ import type { DisplayMessage } from '../../../src/webview/protocol';
 import { Icon } from './Icon';
 
 /** One line that always says what the agent is doing, with how long it has been going. */
-export function WorkingStatus({ messages, since }: { messages: DisplayMessage[]; since: number }) {
+export function WorkingStatus({ messages, since, note }: { messages: DisplayMessage[]; since: number; note?: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const { label, waitingForUser } = describeActivity(messages);
+  const activity = describeActivity(messages);
+  const { waitingForUser } = activity;
+  const label = note && !waitingForUser ? note : activity.label;
   return (
     <div className={`working${waitingForUser ? ' waiting' : ''}`} role="status">
       {waitingForUser ? (

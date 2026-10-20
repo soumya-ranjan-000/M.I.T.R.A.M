@@ -7,8 +7,16 @@ export class ProposalContentProvider implements vscode.TextDocumentContentProvid
   private readonly contents = new Map<string, string>();
   private readonly byApproval = new Map<string, string[]>();
 
+  /** Content computed on demand, so a snapshot that already lives elsewhere is not copied here. */
+  private resolver?: (uri: vscode.Uri) => string | undefined;
+
   provideTextDocumentContent(uri: vscode.Uri): string {
-    return this.contents.get(uri.toString()) ?? '';
+    return this.contents.get(uri.toString()) ?? this.resolver?.(uri) ?? '';
+  }
+
+  /** Serves any URI that was not stored with {@link set}. */
+  setResolver(resolver: (uri: vscode.Uri) => string | undefined): void {
+    this.resolver = resolver;
   }
 
   /** Stores content for one approval and returns the URI to diff against. */

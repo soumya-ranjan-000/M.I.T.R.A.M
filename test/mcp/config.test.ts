@@ -181,9 +181,21 @@ describe('parseServers: auth', () => {
   });
 
   it('drops auth with an unknown kind', () => {
-    const { servers, problems } = one({ a: { url: 'https://x.example/mcp', auth: { kind: 'oauth', name: 'x' } } });
+    const { servers, problems } = one({ a: { url: 'https://x.example/mcp', auth: { kind: 'basic', name: 'x' } } });
     expect(servers[0].auth).toBeUndefined();
     expect(problems[0]).toMatch(/"auth.kind" must be/);
+  });
+
+  it('accepts oauth for a remote server, with no name needed', () => {
+    const { servers, problems } = one({ a: { url: 'https://x.example/mcp', auth: { kind: 'oauth' } } });
+    expect(problems).toEqual([]);
+    expect(servers[0].auth).toEqual({ kind: 'oauth', name: '', format: '{key}' });
+  });
+
+  it('refuses oauth for a local command, which has no sign-in page', () => {
+    const { servers, problems } = one({ a: { command: 'npx', auth: { kind: 'oauth' } } });
+    expect(servers[0].auth).toBeUndefined();
+    expect(problems[0]).toMatch(/oauth.*remote/);
   });
 
   // The secret itself must never be readable from settings.

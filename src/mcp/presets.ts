@@ -11,6 +11,8 @@ export interface PresetField {
   placeholder?: string;
   /** Shown under the prompt, e.g. where to create the token. */
   hint?: string;
+  /** A folder: the wizard suggests the workspace and writes it in this platform's form. */
+  kind?: 'directory';
 }
 
 export interface McpPreset {
@@ -22,7 +24,7 @@ export interface McpPreset {
   entry: McpServerEntry;
   /** Plain values the user is asked for, e.g. a directory or a site URL. */
   fields?: PresetField[];
-  /** Set when the server needs an API key, which is stored as a secret. */
+  /** Set when the server needs an API key, which is stored as a secret. Not used for OAuth, which signs in through the browser. */
   secret?: {
     label: string;
     hint: string;
@@ -65,30 +67,16 @@ export const MCP_PRESETS: McpPreset[] = [
         label: 'Directory the server may access',
         placeholder: '/home/you/projects',
         hint: 'The server can read and write anything under this path.',
+        kind: 'directory',
       },
     ],
   },
   {
     id: 'atlassian',
     label: 'Atlassian (Jira and Confluence)',
-    description: 'Search and update Jira issues and Confluence pages.',
-    entry: {
-      url: '{url}',
-      transport: 'sse',
-      auth: { kind: 'header', name: 'Authorization', format: 'Bearer {key}' },
-    },
-    fields: [
-      {
-        id: 'url',
-        label: 'Atlassian MCP endpoint',
-        placeholder: 'https://mcp.atlassian.com/v1/sse',
-        hint: 'The MCP URL for your site. Must use https.',
-      },
-    ],
-    secret: {
-      label: 'Atlassian API token',
-      hint: 'Create one at id.atlassian.com/manage-profile/security/api-tokens. Stored in VS Code secret storage.',
-    },
+    description: 'Search and update Jira issues and Confluence pages. You sign in with your Atlassian account in the browser.',
+    // Atlassian's hosted server uses OAuth 2.1 with dynamic client registration: nothing to paste.
+    entry: { url: 'https://mcp.atlassian.com/v1/mcp', transport: 'http', auth: { kind: 'oauth' } },
   },
   {
     id: 'postgres',

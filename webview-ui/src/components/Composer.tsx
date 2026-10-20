@@ -60,6 +60,8 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
   const [files, setFilesState] = useState<FileAttachment[]>([]);
   const [hint, setHint] = useState<string | null>(null);
   const [attachOpen, setAttachOpen] = useState(false);
+  // The host listens through the browser (a webview has no microphone) and tells us what happens.
+  const [listening, setListening] = useState(false);
   // Kept in refs too, so attachments added by overlapping pastes or host replies count each other.
   const imagesRef = useRef<ImageAttachment[]>([]);
   const filesRef = useRef<FileAttachment[]>([]);
@@ -76,6 +78,16 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
         } else if (msg.type === 'attachmentsPicked') {
           addFiles(msg.files);
           void addImages(msg.images.map(rawToSource));
+        } else if (msg.type === 'voiceState') {
+          setListening(msg.state === 'listening');
+        } else if (msg.type === 'voiceResult') {
+          // Added to what is already typed, never sent: the person reviews it first.
+          setText((prev) => (prev && !/\s$/.test(prev) ? `${prev} ` : prev) + msg.text);
+          setListening(false);
+          textareaRef.current?.focus();
+        } else if (msg.type === 'voiceError') {
+          setListening(false);
+          setHint(msg.message);
         }
       }),
     [],
@@ -429,6 +441,15 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
               <span>{model || 'model'}</span>
             </button>
             <span className="spacer" />
+            <button
+              className={`tool-btn icon mic${listening ? ' on listening' : ''}`}
+              onClick={() => postToHost({ type: listening ? 'voiceCancel' : 'voiceStart' })}
+              aria-pressed={listening}
+              title={listening ? 'Listening in your browser. Click to cancel.' : 'Speak your prompt. A page opens in your browser to listen.'}
+              aria-label={listening ? 'Cancel voice input' : 'Voice input'}
+            >
+              <Icon name="mic" size={14} />
+            </button>
             {busy ? (
               <button className="send-btn stop" onClick={() => postToHost({ type: 'stop' })} title="Stop (Esc)" aria-label="Stop">
                 <Icon name="stop" size={14} />
@@ -443,7 +464,15 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
       </div>
 
       <div className="composer-foot">
-        {usage ? <UsageBar usage={usage} /> : <span className="hint">Enter to send · Shift+Enter for a new line</span>}
+        {listening ? (
+          <span className="hint listening-hint" role="status">
+            Listening in your browser… speak, then return here
+          </span>
+        ) : usage ? (
+          <UsageBar usage={usage} />
+        ) : (
+          <span className="hint">Enter to send · Shift+Enter for a new line</span>
+        )}
       </div>
     </div>
   );

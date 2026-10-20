@@ -2,7 +2,7 @@
   "name": "mitram",
   "displayName": "M.I.T.R.A.M",
   "description": "A standalone AI coding agent with chat and tool use.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/soumya-ranjan-000/M.I.T.R.A.M.git"
@@ -62,6 +62,14 @@
       {
         "command": "mitram.initProjectInstructions",
         "title": "M.I.T.R.A.M: Create Project Instructions (MITRAM.md)"
+      },
+      {
+        "command": "mitram.setVoiceApiKey",
+        "title": "M.I.T.R.A.M: Set Voice API Key"
+      },
+      {
+        "command": "mitram.clearVoiceApiKey",
+        "title": "M.I.T.R.A.M: Clear Voice API Key"
       },
       {
         "command": "mitram.showLogs",
@@ -244,9 +252,10 @@
                     "type": "string",
                     "enum": [
                       "header",
-                      "env"
+                      "env",
+                      "oauth"
                     ],
-                    "description": "Send the key as an HTTP header (remote) or an environment variable (local)."
+                    "description": "Send the key as an HTTP header (remote) or an environment variable (local), or \"oauth\" to sign in through your browser (remote servers only; no name or key needed)."
                   },
                   "name": {
                     "type": "string",
@@ -256,10 +265,7 @@
                     "type": "string",
                     "description": "Template for the value, with {key} standing for the secret, e.g. \"Bearer {key}\"."
                   }
-                },
-                "required": [
-                  "name"
-                ]
+                }
               },
               "enabled": {
                 "type": "boolean",
@@ -283,6 +289,55 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Run MCP tools the server marks as read-only without asking. The hint comes from the server itself, so leave this off unless you trust every server you have configured. Off by default."
+        },
+        "mitram.notifications": {
+          "type": "string",
+          "enum": [
+            "whenAway",
+            "always",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Desktop notification when VS Code is not in front, for an approval request, a finished run, a pause or an error. A VS Code message if the window is in front but the chat is hidden.",
+            "Always raise a desktop notification, even while you are looking at the chat.",
+            "No notifications."
+          ],
+          "default": "whenAway",
+          "markdownDescription": "When to show an operating system notification, so you know the agent needs you while you are in another window. Works on Windows, macOS and Linux (Linux needs `notify-send`). The text is the action's one-line summary, e.g. `Run npm test`. When VS Code runs on a remote machine, VS Code messages are used instead."
+        },
+        "mitram.voice.provider": {
+          "type": "string",
+          "enum": [
+            "browser",
+            "endpoint"
+          ],
+          "enumDescriptions": [
+            "Your browser's own speech recognition (Chrome, Edge or Safari). Nothing to set up, but the browser vendor's service hears the audio.",
+            "Record in the browser and send the audio to the transcription endpoint below (OpenAI, Azure OpenAI, Groq, or a local Whisper server). Works in any browser."
+          ],
+          "default": "browser",
+          "description": "How speech is turned into text for voice prompts. Audio never goes through VS Code's webview, which cannot use a microphone: a small page opens in your browser to listen."
+        },
+        "mitram.voice.endpoint": {
+          "scope": "application",
+          "type": "string",
+          "default": "",
+          "markdownDescription": "OpenAI-compatible transcription endpoint, used when `mitram.voice.provider` is `endpoint`: a full URL such as `https://api.openai.com/v1/audio/transcriptions`, or a base URL such as `http://localhost:8000/v1`. Must use https unless it is on this machine. Read from user settings only, so a repository cannot send your audio elsewhere. Set the key with **M.I.T.R.A.M: Set Voice API Key**."
+        },
+        "mitram.voice.model": {
+          "type": "string",
+          "default": "whisper-1",
+          "description": "Transcription model, or the deployment name on Azure OpenAI."
+        },
+        "mitram.voice.compactWindow": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the voice page as a small window with no tabs or address bar, when Chrome, Edge, Brave or Chromium is installed. Otherwise, or when off, it opens in your default browser."
+        },
+        "mitram.voice.language": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Language to listen for, such as `en-US` (browser) or `en` (endpoint). Empty uses the browser's language."
         },
         "mitram.mcpToolLimit": {
           "type": "number",

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type { DisplayMessage } from '../../../src/webview/protocol';
 import { Icon } from './Icon';
 import { Markdown } from './Markdown';
@@ -10,7 +10,7 @@ type ToolMessage = Extract<DisplayMessage, { role: 'tool' }>;
  * A sub-agent at work: what it is doing now and any approval it is waiting for. Opened, it shows
  * the brief it was given, every call it made and its report.
  */
-export function SubagentCard({ tool }: { tool: ToolMessage }) {
+export const SubagentCard = memo(function SubagentCard({ tool }: { tool: ToolMessage }) {
   const [open, setOpen] = useState(false);
   const steps = tool.steps ?? [];
   const running = tool.status === 'running';
@@ -86,4 +86,4 @@ export function SubagentCard({ tool }: { tool: ToolMessage }) {
       )}
     </div>
   );
-}
+});

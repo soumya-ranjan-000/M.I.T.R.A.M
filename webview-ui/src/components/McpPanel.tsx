@@ -18,11 +18,14 @@ const STATUS_LABEL: Record<McpStatusKind, string> = {
   ready: 'connected',
   failed: 'failed',
   disabled: 'turned off',
+  'needs-auth': 'sign-in needed',
 };
 
 function summary(server: McpServerView): string {
   if (server.status === 'ready') return `${server.toolCount} tool${server.toolCount === 1 ? '' : 's'}`;
   if (server.status === 'failed') return server.error ?? 'failed';
+  if (server.status === 'needs-auth') return 'sign-in needed';
+  if (server.oauth && server.status === 'connecting') return 'waiting for you to sign in, in your browser…';
   if (server.needsKey && !server.hasKey) return 'no API key set';
   return STATUS_LABEL[server.status];
 }
@@ -120,6 +123,16 @@ export function McpPanel({ servers, presets, problems, onClose }: Props) {
                   {server.description}
                 </div>
                 <div className="mcp-actions">
+                  {server.oauth && (server.status === 'needs-auth' || server.status === 'failed') && server.enabled && (
+                    <button className="primary" onClick={() => postToHost({ type: 'mcpSignIn', id: server.id })}>
+                      Sign in
+                    </button>
+                  )}
+                  {server.oauth && server.signedIn && (
+                    <button onClick={() => postToHost({ type: 'mcpSignOut', id: server.id })} title="Forget the saved sign-in">
+                      Sign out
+                    </button>
+                  )}
                   {server.needsKey && (
                     <button onClick={() => postToHost({ type: 'mcpSetKey', id: server.id })}>
                       {server.hasKey ? 'Replace API key' : 'Set API key'}
@@ -141,8 +154,8 @@ export function McpPanel({ servers, presets, problems, onClose }: Props) {
         )}
 
         <div className="mcp-foot">
-          Tools from a server need your approval before they run, and their results are treated as untrusted data. API keys are kept in VS
-          Code's secret storage.
+          Tools from a server need your approval before they run, and their results are treated as untrusted data. API keys and sign-ins are kept
+          in VS Code's secret storage.
         </div>
       </div>
     </div>

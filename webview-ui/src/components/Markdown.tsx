@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { highlight } from '../highlight';
+import { splitMarkdown } from '../markdownChunks';
 import { postToHost } from '../vscode';
 import { Icon } from './Icon';
 
 function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   const [copied, setCopied] = useState(false);
-  const html = highlight(code, lang);
+  // Highlighting is the costly part of a code block and its inputs rarely change.
+  const html = useMemo(() => highlight(code, lang), [code, lang]);
 
   function copy() {
     postToHost({ type: 'copyCode', code });
@@ -40,24 +42,38 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   );
 }
 
-export function Markdown({ text }: { text: string }) {
+const COMPONENTS = {
+  pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  code({ className, children }: { className?: string; children?: React.ReactNode }) {
+    const lang = /language-(\w+)/.exec(className ?? '')?.[1];
+    const code = String(children).replace(/\n$/, '');
+    if (!lang && !code.includes('\n')) return <code className="inline">{code}</code>;
+    return <CodeBlock code={code} lang={lang} />;
+  },
+  a: ({ children }: { children?: React.ReactNode }) => <span className="link">{children}</span>,
+};
+const PLUGINS = [remarkGfm];
+
+/** One parsed block. Memoised on its text, so a finished block is never parsed again. */
+const Chunk = memo(function Chunk({ text }: { text: string }) {
+  return (
+    <ReactMarkdown remarkPlugins={PLUGINS} components={COMPONENTS}>
+      {text}
+    </ReactMarkdown>
+  );
+});
+
+/**
+ * Markdown for a reply. While a long reply streams in, only its last block changes, so it is split
+ * into blocks and only that one is parsed again for each update.
+ */
+export const Markdown = memo(function Markdown({ text }: { text: string }) {
+  const chunks = useMemo(() => splitMarkdown(text), [text]);
   return (
     <div className="markdown">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          pre: ({ children }) => <>{children}</>,
-          code({ className, children }) {
-            const lang = /language-(\w+)/.exec(className ?? '')?.[1];
-            const code = String(children).replace(/\n$/, '');
-            if (!lang && !code.includes('\n')) return <code className="inline">{code}</code>;
-            return <CodeBlock code={code} lang={lang} />;
-          },
-          a: ({ children }) => <span className="link">{children}</span>,
-        }}
-      >
-        {text}
-      </ReactMarkdown>
+      {chunks.map((chunk, i) => (
+        <Chunk key={i} text={chunk} />
+      ))}
     </div>
   );
-}
+});

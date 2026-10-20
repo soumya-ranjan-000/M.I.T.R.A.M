@@ -22,7 +22,7 @@ export type ApprovalDecision = 'approve' | 'reject' | 'always';
 export const SUBAGENT_TOOL = 'delegate_task';
 
 /** Connection state of one MCP server, as shown in the MCP panel. */
-export type McpStatusKind = 'idle' | 'connecting' | 'ready' | 'failed' | 'disabled';
+export type McpStatusKind = 'idle' | 'connecting' | 'ready' | 'failed' | 'disabled' | 'needs-auth';
 
 /**
  * One MCP server, for the panel. Carries no API key: the key stays in the host's secret storage
@@ -40,6 +40,10 @@ export interface McpServerView {
   needsKey: boolean;
   /** A key has been stored for it. */
   hasKey: boolean;
+  /** This server signs the user in through their browser (OAuth). */
+  oauth: boolean;
+  /** Saved sign-in credentials exist, so Sign out has something to forget. */
+  signedIn: boolean;
   enabled: boolean;
 }
 
@@ -172,6 +176,8 @@ export type WebviewToHost =
   | { type: 'searchFiles'; query: string }
   | { type: 'approval'; id: string; decision: ApprovalDecision }
   | { type: 'viewDiff'; id: string }
+  /** Open what a finished edit_file or create_file call changed, as a diff. */
+  | { type: 'viewChange'; id: string }
   | { type: 'openFile'; path: string; line: number }
   | { type: 'revert' }
   | { type: 'pickModel' }
@@ -179,6 +185,9 @@ export type WebviewToHost =
   | { type: 'continueRun' }
   | { type: 'managePermissions' }
   | { type: 'pickFiles' }
+  /** Start a voice prompt: the host opens a page in the browser to listen. */
+  | { type: 'voiceStart' }
+  | { type: 'voiceCancel' }
   /** Open the MCP panel: the host replies with an `mcpStatus`. */
   | { type: 'mcpRefresh' }
   /** Start the "Add MCP server" wizard, which runs entirely in the host. */
@@ -188,6 +197,9 @@ export type WebviewToHost =
   /** Ask the host to prompt for this server's API key. The key never passes through the webview. */
   | { type: 'mcpSetKey'; id: string }
   | { type: 'mcpRestart'; id?: string }
+  /** Open the browser to sign in to a server that uses OAuth. The credentials never pass through the webview. */
+  | { type: 'mcpSignIn'; id: string }
+  | { type: 'mcpSignOut'; id: string }
   /** file:// URIs copied or dragged from a file manager, for the host to read. */
   | { type: 'readFiles'; uris: string[] }
   /** A file dropped or pasted into the webview that is not an image: the host works out what it is. */
@@ -204,6 +216,8 @@ export type HostToWebview =
   /** Sets or clears (empty text) a sub-agent card's note. */
   | { type: 'toolNote'; id: string; note: string }
   | { type: 'notice'; text: string }
+  /** A passing status for the working line, such as "Connecting to MCP servers…". Not part of the transcript; empty text clears it. */
+  | { type: 'statusNote'; text: string }
   | { type: 'retrieved'; files: RetrievedRef[] }
   | { type: 'checkpoint'; files: string[] }
   | { type: 'modelInfo'; model: string }
@@ -228,6 +242,11 @@ export type HostToWebview =
   | { type: 'sessions'; list: SessionSummary[]; activeId: string | null }
   /** The configured MCP servers and their connection state, for the MCP panel. */
   | { type: 'mcpStatus'; servers: McpServerView[]; presets: McpPresetView[]; problems: string[] }
+  /** Whether the host is waiting for speech. */
+  | { type: 'voiceState'; state: 'listening' | 'idle' }
+  /** What the user said, to add to the message box. */
+  | { type: 'voiceResult'; text: string }
+  | { type: 'voiceError'; message: string }
   | { type: 'loadMessages'; messages: DisplayMessage[] };
 
 const NO_PAYLOAD = new Set([
@@ -243,6 +262,8 @@ const NO_PAYLOAD = new Set([
   'continueRun',
   'managePermissions',
   'pickFiles',
+  'voiceStart',
+  'voiceCancel',
   'mcpRefresh',
   'mcpAdd',
 ]);
@@ -253,8 +274,11 @@ const STRING_FIELD: Record<string, string> = {
   copyCode: 'code',
   searchFiles: 'query',
   viewDiff: 'id',
+  viewChange: 'id',
   mcpRemove: 'id',
   mcpSetKey: 'id',
+  mcpSignIn: 'id',
+  mcpSignOut: 'id',
 };
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;

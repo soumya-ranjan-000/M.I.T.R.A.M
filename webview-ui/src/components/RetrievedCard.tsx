@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type { RetrievedRef } from '../../../src/webview/protocol';
 import { postToHost } from '../vscode';
 import { Icon } from './Icon';
 
 /** The files a local search attached to the user's message before the agent started, each one a link. */
-export function RetrievedCard({ files }: { files: RetrievedRef[] }) {
+export const RetrievedCard = memo(function RetrievedCard({ files }: { files: RetrievedRef[] }) {
   const [open, setOpen] = useState(false);
   const label = `Attached ${files.length} related file${files.length === 1 ? '' : 's'}`;
 
@@ -41,4 +41,4 @@ export function RetrievedCard({ files }: { files: RetrievedRef[] }) {
       )}
     </div>
   );
-}
+});

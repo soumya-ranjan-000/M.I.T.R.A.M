@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { McpServerConfig, parseServers } from '../mcp/config';
+import { NotifyMode, parseMode } from '../notifications/policy';
 
 export interface MitramSettings {
   endpoint: string;
@@ -22,6 +23,8 @@ export interface MitramSettings {
   summarizeContext: boolean;
   subagents: boolean;
   maxParallelSubagents: number;
+  notifications: NotifyMode;
+  voice: { provider: 'browser' | 'endpoint'; endpoint: string; model: string; language: string; compactWindow: boolean };
   /** MCP servers whose tools the agent may use, after validation. */
   mcpServers: McpServerConfig[];
   /** Reasons entries in `mitram.mcpServers` were rejected or adjusted. */
@@ -54,6 +57,14 @@ export function readSettings(): MitramSettings {
     summarizeContext: cfg.get<boolean>('summarizeContext', true),
     subagents: cfg.get<boolean>('subagents', true),
     maxParallelSubagents: Math.min(8, Math.max(1, Math.floor(cfg.get<number>('maxParallelSubagents', 3)))),
+    voice: {
+      provider: cfg.get<string>('voice.provider', 'browser') === 'endpoint' ? 'endpoint' : 'browser',
+      endpoint: cfg.get<string>('voice.endpoint', '').trim(),
+      model: cfg.get<string>('voice.model', 'whisper-1').trim() || 'whisper-1',
+      language: cfg.get<string>('voice.language', '').trim(),
+      compactWindow: cfg.get<boolean>('voice.compactWindow', true),
+    },
+    notifications: parseMode(cfg.get<string>('notifications', 'whenAway')),
     ...readMcp(cfg),
   };
 }

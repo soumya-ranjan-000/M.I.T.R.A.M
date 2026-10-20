@@ -252,8 +252,8 @@ describe('McpManager: status', () => {
     const { manager } = managerWith(configs({ a: { command: 'npx', args: ['-y', 'pkg'] }, b: { command: 'y', enabled: false } }));
 
     expect(manager.status()).toEqual([
-      { id: 'a', status: 'idle', error: undefined, toolCount: 0, description: 'npx -y pkg', needsKey: false, enabled: true },
-      { id: 'b', status: 'disabled', error: undefined, toolCount: 0, description: 'y', needsKey: false, enabled: false },
+      { id: 'a', status: 'idle', error: undefined, toolCount: 0, description: 'npx -y pkg', needsKey: false, oauth: false, enabled: true },
+      { id: 'b', status: 'disabled', error: undefined, toolCount: 0, description: 'y', needsKey: false, oauth: false, enabled: false },
     ]);
   });
 

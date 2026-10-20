@@ -12,7 +12,7 @@ export interface McpServerEntry {
   url?: string;
   headers?: Record<string, string>;
   transport?: 'stdio' | 'http' | 'sse';
-  auth?: { kind?: 'header' | 'env'; name: string; format?: string };
+  auth?: { kind?: 'header' | 'env' | 'oauth'; name?: string; format?: string };
   enabled?: boolean;
 }
 

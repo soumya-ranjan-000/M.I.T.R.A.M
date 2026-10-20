@@ -5,6 +5,7 @@ import {
   SUBAGENT_TOOL,
   type Board,
   type DisplayMessage,
+  type HostToWebview,
   type FileAttachment,
   type ImageAttachment,
   type McpPresetView,
@@ -73,6 +74,7 @@ export function App() {
   const [budget, setBudget] = useState<Budget | null>(null);
   const [mcp, setMcp] = useState<McpState | null>(null);
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [statusNote, setStatusNote] = useState('');
   const planTurn = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -85,8 +87,27 @@ export function App() {
   const [pinned, setPinned] = useState<number | null>(null);
 
   useEffect(() => {
+    // Transcript events are applied once per frame, in order, instead of once each: a fast stream
+    // or a burst of tool updates then costs one render, not dozens.
+    let queue: HostToWebview[] = [];
+    let frame = 0;
+    const flush = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      const batch = queue;
+      queue = [];
+      if (batch.length) setMessages((prev) => batch.reduce((messages, event) => applyHostEvent(messages, event), prev));
+    };
+    const enqueue = (event: HostToWebview) => {
+      queue.push(event);
+      frame ||= requestAnimationFrame(flush);
+    };
+
     const off = onHostMessage((msg) => {
       switch (msg.type) {
+        case 'statusNote':
+          setStatusNote(msg.text);
+          break;
         case 'streamDelta':
         case 'thinkingDelta':
         case 'toolStart':
@@ -94,9 +115,13 @@ export function App() {
         case 'toolAllowRule':
         case 'toolNote':
         case 'notice':
-          setMessages((prev) => applyHostEvent(prev, msg));
+          // Real output has begun, so a passing status no longer applies.
+          if (msg.type !== 'notice') setStatusNote('');
+          enqueue(msg);
           break;
         case 'streamEnd':
+          flush();
+          setStatusNote('');
           setBusy(false);
           if (planTurn.current) setPlanReady(true);
           break;
@@ -116,11 +141,17 @@ export function App() {
           setModel(msg.model);
           break;
         case 'error':
+          flush();
+          setStatusNote('');
           setError({ message: msg.message, needsSetup: !!msg.needsSetup });
           setBusy(false);
           setPlanReady(false);
           break;
         case 'loadMessages':
+          // A different transcript: events still waiting belong to the old one.
+          queue = [];
+          if (frame) cancelAnimationFrame(frame);
+          frame = 0;
           setMessages(msg.messages);
           setUsage(null);
           setPlanReady(false);
@@ -150,7 +181,10 @@ export function App() {
       }
     });
     postToHost({ type: 'ready' });
-    return off;
+    return () => {
+      off();
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, []);
 
   // Escape stops a running turn (unless a menu in the composer already used it).
@@ -383,7 +417,7 @@ export function App() {
           {busy && (
             <>
               {messages.length > 0 && speaker(messages[messages.length - 1]) === 'user' && <MessageHeader role="assistant" />}
-              <WorkingStatus messages={messages} since={busySince} />
+              <WorkingStatus messages={messages} since={busySince} note={statusNote} />
             </>
           )}
 

@@ -1,5 +1,6 @@
 import type { Tool } from '../tools/Tool';
 import { McpClient, McpClientDeps, McpStatus } from './McpClient';
+import type { OAuthHost } from './oauth';
 import { McpServerConfig, describeServer } from './config';
 import { isReadOnlyHinted, mcpTool } from './mcpTool';
 import { encodeToolName } from './naming';
@@ -15,6 +16,8 @@ export interface McpServerStatus {
   description: string;
   /** The server declares an API key but none is stored yet. */
   needsKey: boolean;
+  /** The server signs the user in through their browser instead of using a key. */
+  oauth: boolean;
   enabled: boolean;
 }
 
@@ -31,6 +34,8 @@ export interface McpManagerDeps {
    * Returning false leaves every server untouched.
    */
   confirmTrust?: (servers: McpServerConfig[]) => Promise<boolean>;
+  /** Storage and browser access for servers that use OAuth sign-in. */
+  oauth?: OAuthHost;
   log?: (message: string) => void;
   /** Called when a server's status changes, so the UI can refresh. */
   onChange?: () => void;
@@ -64,7 +69,7 @@ export class McpManager {
   }
 
   private build(config: McpServerConfig): McpClient {
-    const clientDeps: McpClientDeps = { getApiKey: this.deps.getApiKey, log: this.deps.log };
+    const clientDeps: McpClientDeps = { getApiKey: this.deps.getApiKey, log: this.deps.log, oauth: this.deps.oauth };
     return this.deps.createClient?.(config, clientDeps) ?? new McpClient(config, clientDeps);
   }
 
@@ -150,7 +155,8 @@ export class McpManager {
         error: client?.error,
         toolCount: client?.tools.length ?? 0,
         description: describeServer(config),
-        needsKey: !!config.auth,
+        needsKey: !!config.auth && config.auth.kind !== 'oauth',
+        oauth: config.auth?.kind === 'oauth',
         enabled: config.enabled,
       };
     });
@@ -192,6 +198,28 @@ export class McpManager {
       if (config && !sameConfig(config, this.clients.get(id)!.config)) this.clients.set(id, this.build(config));
     }
     await this.ensureStarted();
+    this.deps.onChange?.();
+  }
+
+  /**
+   * Signs a server in through the user's browser. Asked for by the user, so it also counts as their
+   * agreement to run the server, like Reconnect does. Resolves when the outcome is known.
+   */
+  async signIn(id: string): Promise<void> {
+    const client = this.clients.get(id);
+    if (!client) return;
+    this.trusted ??= true;
+    this.deps.onChange?.();
+    const done = client.signIn();
+    // The status reads "connecting" while the browser is open.
+    this.deps.onChange?.();
+    await done;
+    this.deps.onChange?.();
+  }
+
+  /** Forgets a server's saved sign-in. */
+  async signOut(id: string): Promise<void> {
+    await this.clients.get(id)?.signOut();
     this.deps.onChange?.();
   }
 

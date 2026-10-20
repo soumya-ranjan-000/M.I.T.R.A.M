@@ -57,6 +57,16 @@ Edits and commands wait for you. **View diff** opens VS Code's diff editor on th
 
 <p align="center"><img src="media/screenshots/03-approval.png" alt="An edit waiting for approval with View diff, Allow, Always allow and Reject" width="360"></p>
 
+**Seeing what it changed.** Once an edit or new file is in, click its card in the chat (or **View diff**) to open the before and after in VS Code's diff editor. It shows exactly what that one call changed and stays correct even if you edit the file afterwards.
+
+### Notifications
+
+If you switch to another window while the agent works, you still hear when it needs you: an operating system notification for an approval request, a finished run, a pause or an error (Windows, macOS and Linux; Linux needs `notify-send`). With VS Code in front but the chat hidden you get a VS Code message instead. Set `mitram.notifications` to `always` or `off` to change this.
+
+### Voice prompts
+
+Press the microphone next to Send and speak. A page opens in your browser to listen (a VS Code chat view cannot reach the microphone), and your words appear in the message box to review before you send. It needs no install and works on Windows, macOS and Linux, and over Remote SSH and WSL. By default it uses the browser's own speech recognition (Chrome, Edge or Safari), which means the browser vendor's service hears the audio. To use your own service instead, set `mitram.voice.provider` to `endpoint`, point `mitram.voice.endpoint` at an OpenAI-compatible transcription URL (OpenAI, Azure OpenAI, Groq, a local Whisper server) and run **M.I.T.R.A.M: Set Voice API Key**.
+
 ### Plan mode
 
 Turn on **Plan** (or type `/plan`) and the agent only investigates and proposes a plan. Nothing is changed until you press **Execute plan**.
@@ -134,7 +144,9 @@ An [MCP](https://modelcontextprotocol.io) server is a small program that offers 
 
 **Adding one.** Click the plug icon in the chat header (or type `/mcp`) and press **+**. Pick a ready-made entry — Playwright, GitHub, Filesystem, Atlassian, PostgreSQL, Sentry — or **Custom…** for any command or `https` URL. You are asked for anything it needs, such as a directory or an API key. The panel then shows whether it connected and how many tools it offers.
 
-**API keys** are typed into a password box and stored in VS Code's secret storage. They are never written to `settings.json` and never reach the chat view. Removing a server deletes its key too. A server can take its key as an HTTP header (`Authorization: Bearer …`, the usual choice for a hosted service such as Atlassian) or as an environment variable (`GITHUB_PERSONAL_ACCESS_TOKEN`, the usual choice for a local one).
+**Signing in with OAuth.** Some hosted servers, Atlassian's among them, sign you in through your browser instead of taking a key. Choose **Atlassian** in the picker and approve access when the page opens; there is nothing to paste. M.I.T.R.A.M registers itself with the server automatically and renews access in the background. If a server shows **Sign in** in the panel, press it; **Sign out** forgets the saved sign-in. For another server that supports it, use **Custom…** → **Sign in with your browser (OAuth)**, or `"auth": { "kind": "oauth" }` by hand. The sign-in is kept in VS Code's secret storage, and a browser only opens when you press **Sign in**. Over Remote SSH or WSL, VS Code forwards the return address for you.
+
+**API keys** are typed into a password box and stored in VS Code's secret storage. They are never written to `settings.json` and never reach the chat view. Removing a server deletes its key too. A server can take its key as an HTTP header (`Authorization: Bearer …`, for hosted services that issue API keys) or as an environment variable (`GITHUB_PERSONAL_ACCESS_TOKEN`, the usual choice for a local one).
 
 **By hand.** The panel writes to `mitram.mcpServers` in your user settings, which you can also edit directly:
 
@@ -142,8 +154,8 @@ An [MCP](https://modelcontextprotocol.io) server is a small program that offers 
 "mitram.mcpServers": {
   "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@latest"] },
   "atlassian":  {
-    "url": "https://mcp.atlassian.com/v1/sse",
-    "auth": { "kind": "header", "name": "Authorization", "format": "Bearer {key}" }
+    "url": "https://mcp.atlassian.com/v1/mcp",
+    "auth": { "kind": "oauth" }
   },
   "github": {
     "command": "npx",
@@ -179,6 +191,8 @@ A `command` starts a local server; a `url` connects to a remote one, which must 
 | `mitram.mcpToolLimit`                                                                | Most MCP tools offered to the model at once (default 60). Tool definitions cost tokens on every request                                                 |
 | `mitram.blockedMcpTools`                                                             | Patterns for MCP tools to refuse outright, e.g. `mcp__.*__delete_.*`                                                                                    |
 | `mitram.autoApproveMcpReads`                                                         | Run MCP tools the server itself marks read-only without asking (default off; the hint comes from the server, so leave it off unless you trust them all) |
+| `mitram.notifications`                                                               | When to raise an OS notification: `whenAway` (default), `always` or `off`                                                                               |
+| `mitram.voice.provider` / `.endpoint` / `.model` / `.language`                       | How voice prompts are transcribed: `browser` (default) or an OpenAI-compatible `endpoint` (user settings only), its model and the language to listen for |
 | `mitram.skipApprovalPrompts`, `mitram.autoApprove*`, `mitram.blockedCommandPatterns` | See above                                                                                                                                               |
 
 ## Project instructions
@@ -189,6 +203,8 @@ Run **M.I.T.R.A.M: Create Project Instructions (MITRAM.md)** to create a `MITRAM
 
 - **No telemetry.** This extension does not collect or send usage data.
 - **Where your data goes.** The only network traffic is to the endpoint you configure. It is read from your user settings only, so a repository's `.vscode/settings.json` cannot redirect your requests or API key. Each request contains your message, files, selections and images you attach, the results of tools the agent ran (file contents, command output), the agent's plan board, and, unless you turn them off, the environment summary described above and the files and excerpts a local search matched to your message. The search index is built on your machine and kept in memory only. When a long conversation is summarised, the earlier part of it is sent to the same endpoint to be summarised.
+- **Voice prompts** record in your browser, not in VS Code. With the default `browser` provider the browser's speech service (Google for Chrome, Microsoft for Edge, Apple for Safari) receives the audio. With `endpoint`, the audio goes only to the URL you set in your user settings. Nothing is recorded unless you press the microphone, and the page and its local server close when you are done.
+- **Notifications** show the one-line summary of what the agent wants to do, for example `Run npm test`, through your operating system's notification service.
 - **Your API key** is kept in VS Code's secret storage and is never written to settings, logs or chat history.
 - **Chats** are stored locally in VS Code's extension storage on your machine. To keep that small, saved chats keep the images and PDFs of only their last two messages with them, in your three most recent chats; older images show as "image (not kept)". Text read from attached files is kept like any other attached context.
 - **Logs** (`M.I.T.R.A.M: Show Logs`) are local, contain no prompts, file contents or command output, and have anything resembling a credential redacted. **Copy Diagnostics for Bug Report** includes only versions, settings and the endpoint's host name.
@@ -199,6 +215,9 @@ Run **M.I.T.R.A.M: Create Project Instructions (MITRAM.md)** to create a `MITRAM
 - _404 or "Not found"_: check the endpoint URL, and that `mitram.model` is your deployment name.
 - _An error mentioning `cache_control`_: set `mitram.promptCaching` to `false`.
 - _The agent says it has no tools_: it is running without a folder, or the model deployment does not support tool use.
+- _The Filesystem MCP server cannot reach my folder (Windows)_: remove it and add it again from the MCP panel. The wizard fills in your project folder in the right form (`C:\Users\you\project`) and checks that it exists. Open **M.I.T.R.A.M: Show Logs** to see why a server failed to start.
+- _No desktop notifications on Linux_: install `notify-send` (package `libnotify-bin` or `libnotify`). Until then you get VS Code messages instead.
+- _The microphone page says the browser blocked the microphone_: click the icon in the address bar and allow it for the page. Firefox has no built-in speech recognition, so use Chrome, Edge or Safari, or set `mitram.voice.provider` to `endpoint`.
 
 ## Development
 

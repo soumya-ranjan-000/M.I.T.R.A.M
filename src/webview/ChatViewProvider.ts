@@ -1,6 +1,9 @@
+import { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { AgentEvent, ApprovalRequest, runAgent } from '../agent/AgentLoop';
+import { AgentEvent, ApprovalRequest, FileChange, runAgent } from '../agent/AgentLoop';
 import { emptyBoard } from '../agent/board';
 import { formatEnvironment } from '../agent/environment';
 import { gatherEnvironment } from '../agent/gatherEnvironment';
@@ -30,8 +33,13 @@ import {
   suggestCommandRule,
 } from '../safety/commandPolicy';
 import { Logger } from '../logging';
+import { Notifier } from '../notifications/Notifier';
+import { VoiceSession, startVoiceSession } from '../voice/voiceServer';
+import { endpointProblem, transcribe } from '../voice/transcribe';
+import { appWindowArgs, findAppBrowser } from '../voice/appWindow';
 import { McpConfigStore, McpServerEntry } from '../mcp/McpConfigStore';
 import { McpManager } from '../mcp/McpManager';
+import { normalizeDirectory } from '../mcp/paths';
 import { MCP_PRESETS, McpPreset, buildEntry } from '../mcp/presets';
 import { McpTrustStore } from '../storage/mcpTrust';
 import { createRegistry } from '../tools';
@@ -39,6 +47,7 @@ import { createDelegateTaskTool } from '../tools/delegateTask';
 import { Tool, ToolRegistry } from '../tools/Tool';
 import { createDiagnosticsReader, createVscodeFilePort } from '../tools/vscodeHost';
 import { applyHostEvent } from './displayReducer';
+import { ChangeLog } from './changeLog';
 import { ProposalContentProvider } from './ProposalContentProvider';
 import {
   ApprovalDecision,
@@ -66,6 +75,12 @@ interface Run {
 const MODEL_KEY = 'mitram.model';
 /** Steps one sub-agent may take: enough for a focused task, short of the main agent's budget. */
 const SUBAGENT_MAX_STEPS = 40;
+/** Marks a diff URI whose text comes from the change log rather than from a stored proposal. */
+const CHANGE_QUERY = 'change:';
+/** How long streamed text is gathered before it is sent to the webview. Short enough to read as live. */
+const DELTA_FLUSH_MS = 40;
+/** How long the small voice window gets to load its page before the default browser is used. */
+const PAGE_LOAD_MS = 6000;
 const OTHER_MODEL = 'Enter another model or deployment name…';
 
 const FILE_EXCLUDE = '**/{node_modules,.git,dist,out,build,.vscode-test}/**';
@@ -88,6 +103,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private readonly alwaysAllowed = new Set<string>();
   private readonly pendingTools = new Map<string, ApprovalRequest>();
   private readonly checkpoints = new Map<string, Checkpoint>();
+  /** What each finished edit changed, for the diff a card opens. Lost when the window reloads. */
+  private readonly changes = new ChangeLog();
+  private voice?: VoiceSession;
+  private pendingDelta?: { session: Session; type: 'streamDelta' | 'thinkingDelta'; text: string };
+  private deltaTimer?: NodeJS.Timeout;
+  private readonly notifier = new Notifier({
+    mode: () => readSettings().notifications,
+    viewVisible: () => !!this.view?.visible,
+    openChat: () => this.focus(),
+    log: (message) => this.logger.info(message),
+  });
   // Kept for a view that is opened again mid-run: VS Code rebuilds a hidden view from scratch.
   private runStartedAt = 0;
   private runPlan = false;
@@ -107,8 +133,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly trust?: McpTrustStore,
   ) {
     this.lastEditor = pickEditor(vscode.window.activeTextEditor);
+    this.proposals.setResolver((uri) => {
+      const m = new RegExp(`^${CHANGE_QUERY}(before|after):(.+)$`).exec(uri.query);
+      const change = m ? this.changes.get(m[2]).find((c) => `/${c.path}` === uri.path) : undefined;
+      return change ? (m![1] === 'before' ? (change.before ?? '') : change.after) : undefined;
+    });
     subscriptions.push(
       { dispose: () => this.retriever.dispose() },
+      { dispose: () => this.voice?.cancel() },
       vscode.window.onDidChangeActiveTextEditor((e) => {
         this.lastEditor = pickEditor(e) ?? this.lastEditor;
         this.postContextInfo();
@@ -171,23 +203,38 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     await this.mcp?.refresh();
     this.postMcpStatus();
     void vscode.window.showInformationMessage(`M.I.T.R.A.M: added the MCP server "${added}".`);
+    // Adding a server that signs in through the browser means signing in now, not on the first message.
+    if (this.mcpConfig?.list().servers.find((s) => s.id === added)?.auth?.kind === 'oauth') {
+      await this.mcp?.signIn(added);
+      this.postMcpStatus();
+    }
   }
 
   /** Asks for a preset's fields and key, then writes it to settings. Returns the new server id. */
   private async addFromPreset(preset: McpPreset): Promise<string | undefined> {
     const answers: Record<string, string> = {};
     for (const field of preset.fields ?? []) {
+      const folder = field.kind === 'directory';
+      const pathEnv = { platform: process.platform, home: os.homedir(), env: process.env, base: workspaceRoot() };
       const value = await vscode.window.showInputBox({
         title: `Add ${preset.label}`,
         prompt: field.label,
-        placeHolder: field.placeholder,
+        placeHolder: folder ? examplePath() : field.placeholder,
         // `hint` explains where to find the value, so keep it visible while typing.
         ignoreFocusOut: true,
-        value: field.placeholder && field.id === 'url' ? field.placeholder : undefined,
-        validateInput: (text) => (text.trim() ? null : `${field.label} is required.`),
+        // A folder defaults to the open project, which is what people almost always mean.
+        value: folder ? workspaceRoot() : field.id === 'url' ? field.placeholder : undefined,
+        validateInput: (text) => {
+          if (!text.trim()) return `${field.label} is required.`;
+          if (!folder) return null;
+          const dir = normalizeDirectory(text, pathEnv);
+          if (!dir) return 'Enter the full path of a folder, e.g. ' + examplePath();
+          return isDirectory(dir) ? null : `"${dir}" is not a folder that exists on this machine.`;
+        },
       });
       if (value === undefined) return undefined;
-      answers[field.id] = value.trim();
+      // Written the way this platform's programs expect: no quotes, one kind of slash, no trailing one.
+      answers[field.id] = folder ? (normalizeDirectory(value, pathEnv) ?? value.trim()) : value.trim();
     }
 
     const id = this.mcpConfig!.freeId(preset.id);
@@ -256,12 +303,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const id = this.mcpConfig!.freeId(name);
     const wantsKey = await vscode.window.showQuickPick(
       [
-        { label: 'No authentication', needsKey: false },
-        { label: 'API key', detail: 'Stored in VS Code secret storage, never in settings.json', needsKey: true },
+        { label: 'No authentication', needsKey: false, oauth: false },
+        { label: 'API key', detail: 'Stored in VS Code secret storage, never in settings.json', needsKey: true, oauth: false },
+        ...(kind.local
+          ? []
+          : [{ label: 'Sign in with your browser (OAuth)', detail: 'For servers such as Atlassian and Sentry that offer it. No key to paste', needsKey: false, oauth: true }]),
       ],
       { title: `Add ${id}`, placeHolder: 'Does this server need an API key?' },
     );
     if (!wantsKey) return undefined;
+
+    if (wantsKey.oauth) entry.auth = { kind: 'oauth' };
 
     if (wantsKey.needsKey) {
       const header = kind.local
@@ -323,6 +375,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     await this.mcpConfig.remove(id);
     // Leaving a key behind would quietly reauthenticate a server added again under the same name.
     await this.secrets.clearMcpKey(id);
+    await this.secrets.clearMcpOAuth(id);
     await this.refreshMcp();
   }
 
@@ -360,13 +413,48 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   post(message: HostToWebview): void {
+    // Keep the order the events happened in: any text still waiting goes out first.
+    this.flushDeltas();
+    this.send(message);
+  }
+
+  private send(message: HostToWebview): void {
     void this.view?.webview.postMessage(message);
   }
 
   /** Sends a transcript event to the webview and records it in the saved session. */
   private emit(session: Session, event: HostToWebview): void {
+    if (event.type === 'streamDelta' || event.type === 'thinkingDelta') {
+      this.queueDelta(session, event);
+      return;
+    }
+    this.flushDeltas();
     session.display = applyHostEvent(session.display, event);
-    if (session === this.session) this.post(event);
+    if (session === this.session) this.send(event);
+  }
+
+  /**
+   * Streamed text arrives a few words at a time, often dozens of times a second. Each piece used
+   * to cost a message to the webview, a re-render and a copy of the transcript, so pieces of the
+   * same kind are joined and sent every {@link DELTA_FLUSH_MS} instead.
+   */
+  private queueDelta(session: Session, event: Extract<HostToWebview, { type: 'streamDelta' | 'thinkingDelta' }>): void {
+    const pending = this.pendingDelta;
+    if (pending && (pending.session !== session || pending.type !== event.type)) this.flushDeltas();
+    if (this.pendingDelta) this.pendingDelta.text += event.text;
+    else this.pendingDelta = { session, type: event.type, text: event.text };
+    this.deltaTimer ??= setTimeout(() => this.flushDeltas(), DELTA_FLUSH_MS);
+  }
+
+  private flushDeltas(): void {
+    if (this.deltaTimer) clearTimeout(this.deltaTimer);
+    this.deltaTimer = undefined;
+    const pending = this.pendingDelta;
+    if (!pending) return;
+    this.pendingDelta = undefined;
+    const event = { type: pending.type, text: pending.text };
+    pending.session.display = applyHostEvent(pending.session.display, event);
+    if (pending.session === this.session) this.send(event);
   }
 
   private resolvePending(decision: ApprovalDecision): void {
@@ -436,6 +524,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'viewDiff':
         await this.viewDiff(message.id);
         break;
+      case 'voiceStart':
+        await this.startVoice();
+        break;
+      case 'voiceCancel':
+        this.voice?.cancel();
+        break;
+      case 'viewChange':
+        await this.viewChange(message.id);
+        break;
       case 'openFile':
         await this.openFile(message.path, message.line);
         break;
@@ -479,6 +576,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'mcpSetKey':
         await this.setMcpKey(message.id);
+        break;
+      case 'mcpSignIn':
+        await this.mcp?.signIn(message.id);
+        this.postMcpStatus();
+        break;
+      case 'mcpSignOut':
+        await this.mcp?.signOut(message.id);
+        this.postMcpStatus();
         break;
       case 'mcpRestart':
         await this.mcp?.restart(message.id);
@@ -550,10 +655,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (!this.mcp) return;
     void (async () => {
       const servers = this.mcp!.status();
-      const stored = await this.secrets.mcpKeysPresent(servers.map((s) => s.id));
+      const ids = servers.map((s) => s.id);
+      const [stored, signedIn] = await Promise.all([this.secrets.mcpKeysPresent(ids), this.secrets.mcpOAuthPresent(ids)]);
       this.post({
         type: 'mcpStatus',
-        servers: servers.map((s) => ({ ...s, hasKey: stored.has(s.id) })),
+        servers: servers.map((s) => ({ ...s, hasKey: stored.has(s.id), signedIn: signedIn.has(s.id) })),
         presets: MCP_PRESETS.map(({ id, label, description, secret }) => ({ id, label, description, needsKey: !!secret })),
         problems: this.mcpConfig?.list().problems ?? [],
       });
@@ -651,15 +757,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     this.contextWindow = settings.contextWindow;
     const session = this.session;
-    const parts = await gatherContext({
-      includeActive: run.includeActive,
-      editor: this.lastEditor,
-      mentions: run.mentions,
-    });
+    const rootForEnv = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    // Everything below is independent of the rest, and any of it can be slow (starting an MCP
+    // server can take many seconds), so it all starts now and is awaited where it is needed.
+    const registryPromise = rootForEnv ? createRegistry(this.mcp) : undefined;
+    const instructionsPromise = rootForEnv ? loadProjectInstructions(rootForEnv) : undefined;
+    const [parts, envInfo] = await Promise.all([
+      gatherContext({ includeActive: run.includeActive, editor: this.lastEditor, mentions: run.mentions }),
+      settings.includeEnvironment && rootForEnv ? gatherEnvironment(rootForEnv) : undefined,
+    ]);
 
     const turnStart = session.history.length;
-    const rootForEnv = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const envInfo = settings.includeEnvironment && rootForEnv ? await gatherEnvironment(rootForEnv) : undefined;
     // Code a keyword search matched to the message, so the model can start there instead of searching.
     const retrieved: Retrieval =
       settings.retrieveContext && rootForEnv && !run.continueTask && run.text.trim()
@@ -695,8 +803,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
     // Connects MCP servers on the first run that needs them; a failed server costs only its tools.
-    if (root && this.mcp?.configured) this.emit(session, { type: 'notice', text: 'Connecting to MCP servers…' });
-    const fullRegistry = root ? await createRegistry(this.mcp) : new ToolRegistry();
+    // Shown on the working line only while it lasts: it is not part of the conversation.
+    if (root && this.mcp?.configured) this.post({ type: 'statusNote', text: 'Connecting to MCP servers…' });
+    const fullRegistry = registryPromise ? await registryPromise : new ToolRegistry();
+    if (root && this.mcp?.configured) this.post({ type: 'statusNote', text: '' });
+    this.offerSignIn();
     if (root && this.mcp?.configured) this.postMcpStatus();
     // Plan mode: read-only tools, so nothing can change until the user approves the plan.
     // MCP tools all require approval, so readOnly() leaves them out automatically.
@@ -711,7 +822,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.checkpoints.set(session.id, checkpoint);
 
     const date = new Date().toISOString().slice(0, 10);
-    const projectInstructions = root ? await loadProjectInstructions(root) : null;
+    const projectInstructions = instructionsPromise ? await instructionsPromise : null;
     const autoApprove = (tool: Tool, input: unknown) =>
       isAutoApproved(
         tool.name,
@@ -740,12 +851,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             summarizeContext: settings.summarizeContext,
             onEvent: (parentId, event) => this.onSubagentEvent(session, parentId, event),
             onNote: (id, note) => this.emit(session, { type: 'toolNote', id, note }),
+            onFileChange: (change) => this.logChange(change),
             isAutoApproved: autoApprove,
             requestApproval: (request, parentId) => this.askApproval(session, request, abort.signal, parentId),
             log: (message) => this.logger.info(message),
           })
         : undefined;
 
+    let pausedFor: 'steps' | 'time' | 'stuck' | undefined;
+    const pausedText = { steps: 'It used all of its steps. Open the chat to continue.', time: 'It reached the time limit. Open the chat to continue.', stuck: 'It kept repeating one action. Open the chat to guide it.' };
     this.logger.info(`run start: model=${this.activeModel()} plan=${run.plan} tools=${registry.size} retry=${isRetry}`);
     try {
       await runAgent({
@@ -783,12 +897,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         summarizeContext: settings.summarizeContext,
         getBoard: () => session.board ?? emptyBoard(),
         contextWindow: settings.contextWindow,
-        onEvent: (event) => this.onAgentEvent(session, event),
+        onEvent: (event) => {
+          if (event.type === 'budget') pausedFor = event.reason;
+          this.onAgentEvent(session, event);
+        },
+        onFileChange: (change) => this.logChange(change),
         isAutoApproved: autoApprove,
         requestApproval: (request) => this.askApproval(session, request, abort.signal),
       });
       this.lastRun = undefined;
       this.post({ type: 'streamEnd' });
+      const ran = Date.now() - this.runStartedAt;
+      if (pausedFor) void this.notifier.notify('paused', 'M.I.T.R.A.M paused', pausedText[pausedFor]);
+      else void this.notifier.notify('done', 'M.I.T.R.A.M finished', session.title, ran);
     } catch (error) {
       if (abort.signal.aborted) {
         // History is kept consistent by the agent loop, so a cancelled turn is not retried.
@@ -804,8 +925,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           message: describeError(error),
           needsSetup: status === 401 || status === 403 || status === 404,
         });
+        void this.notifier.notify('error', 'M.I.T.R.A.M hit an error', describeError(error));
       }
     } finally {
+      this.flushDeltas();
       if (this.abort === abort) this.abort = undefined;
       // Pick up the files this run changed, so the next message's search sees them.
       if (root && settings.retrieveContext) void this.retriever.warm(root);
@@ -890,6 +1013,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       this.emit(session, { type: 'toolAllowRule', id, label: describeRule(rule), usesShell: hasShellSyntax(rule.command), parentId });
     }
     this.pendingTools.set(id, request);
+    // The agent is blocked until the user answers, so tell them even if they are in another window.
+    void this.notifier.notify('approval', 'M.I.T.R.A.M needs your approval', request.summary);
     const settle = () => {
       this.pendingTools.delete(id);
       this.proposals.clear(id);
@@ -1030,6 +1155,117 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /**
+   * Voice prompt. A VS Code webview cannot use the microphone, so a page on localhost opens in the
+   * user's browser, listens, and sends the text back here (see src/voice).
+   */
+  private async startVoice(): Promise<void> {
+    this.voice?.cancel();
+    const { voice } = readSettings();
+    const language = voice.language;
+    const configured = voice.endpoint ? endpointProblem(voice.endpoint) === null : false;
+
+    if (voice.provider === 'endpoint' && !configured) {
+      this.post({ type: 'voiceError', message: endpointProblem(voice.endpoint) ?? 'No transcription endpoint is set.' });
+      const open = await vscode.window.showWarningMessage(
+        'M.I.T.R.A.M: Voice input is set to use a transcription endpoint, but none is configured.',
+        'Open Settings',
+      );
+      if (open) void vscode.commands.executeCommand('workbench.action.openSettings', 'mitram.voice');
+      return;
+    }
+
+    const apiKey = configured ? await this.secrets.getVoiceKey() : undefined;
+    if (apiKey) this.logger.addSecret(apiKey);
+    let session: VoiceSession;
+    try {
+      session = await startVoiceSession({
+        mode: voice.provider === 'endpoint' ? 'record' : 'browser',
+        language,
+        // The endpoint is also the fallback for a browser with no speech recognition.
+        transcribe: configured
+          ? (wav, signal) => transcribe(wav, { endpoint: voice.endpoint, apiKey, model: voice.model, language: language.split('-')[0] }, signal)
+          : undefined,
+      });
+    } catch (error) {
+      this.logger.error(`voice: could not start (${(error as Error).message})`);
+      this.post({ type: 'voiceError', message: 'Could not start voice input on this machine.' });
+      return;
+    }
+    this.voice = session;
+
+    // Remote windows (SSH, WSL, containers) forward the port, so the local browser can reach it.
+    // The small window is only trusted once its page has actually loaded: a browser can start and
+    // still fail to show anything (a crash on startup, a profile that is locked), and then the
+    // default browser is the way through.
+    let shown = false;
+    if (!vscode.env.remoteName && voice.compactWindow && (await openAppWindow(session.url))) {
+      shown = await session.waitForPage(PAGE_LOAD_MS);
+      if (!shown) this.logger.info('voice: the small window did not open; using the default browser');
+    }
+    if (!shown && !(await vscode.env.openExternal(await vscode.env.asExternalUri(vscode.Uri.parse(session.url))))) {
+      session.cancel();
+      this.post({ type: 'voiceError', message: 'Could not open your browser.' });
+      return;
+    }
+    this.logger.info(`voice: listening (${voice.provider})`);
+    this.post({ type: 'voiceState', state: 'listening' });
+
+    session.result.then(
+      (text) => {
+        if (this.voice === session) this.post({ type: 'voiceResult', text });
+      },
+      (error: Error) => {
+        // A cancel is the user's own choice, not a failure.
+        if (this.voice === session && error.message !== 'Cancelled') this.post({ type: 'voiceError', message: error.message });
+      },
+    ).finally(() => {
+      if (this.voice !== session) return;
+      this.voice = undefined;
+      this.post({ type: 'voiceState', state: 'idle' });
+    });
+  }
+
+  /** Servers that asked the user to sign in, offered once each so a run is never held up by a browser. */
+  private readonly signInOffered = new Set<string>();
+
+  private offerSignIn(): void {
+    for (const server of this.mcp?.status() ?? []) {
+      if (server.status !== 'needs-auth' || this.signInOffered.has(server.id)) continue;
+      this.signInOffered.add(server.id);
+      void Promise.resolve(
+        vscode.window.showInformationMessage(`M.I.T.R.A.M: the MCP server "${server.id}" needs you to sign in. Its tools are off until you do.`, 'Sign in'),
+      ).then((choice) => {
+        if (choice === 'Sign in') void this.mcp?.signIn(server.id).then(() => this.postMcpStatus());
+      });
+    }
+  }
+
+  private logChange({ callId, abs, before, after }: FileChange): void {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    this.changes.record(callId, { path: root ? path.relative(root, abs) : abs, abs, before, after });
+  }
+
+  /**
+   * Opens what a finished edit changed: the file as it was before the call against the file as the
+   * call left it. Both sides are snapshots, so the diff stays right if the file is edited later.
+   */
+  private async viewChange(id: string): Promise<void> {
+    const [change] = this.changes.get(id);
+    if (!change) {
+      void vscode.window.showInformationMessage(
+        'M.I.T.R.A.M: This change is no longer available. Diffs are kept until the window reloads, and are skipped for very large files.',
+      );
+      return;
+    }
+    const side = (which: 'before' | 'after') =>
+      vscode.Uri.from({ scheme: ProposalContentProvider.scheme, path: `/${change.path}`, query: `${CHANGE_QUERY}${which}:${id}` });
+    const left = side('before');
+    const right = side('after');
+    const title = `${change.path} (${change.before === null ? 'new file' : 'changed by M.I.T.R.A.M'})`;
+    await vscode.commands.executeCommand('vscode.diff', left, right, title);
+  }
+
   private postCheckpoint(): void {
     const checkpoint = this.checkpoints.get(this.session.id);
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -1134,6 +1370,58 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   <script type="module" nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
+  }
+}
+
+/**
+ * Opens `url` as a small app-style window in an installed Chromium-based browser. False if there is
+ * none or it would not start, so the caller can fall back to the default browser.
+ */
+function openAppWindow(url: string): Promise<boolean> {
+  const exists = (target: string) => {
+    if (path.isAbsolute(target)) return fs.existsSync(target);
+    const dirs = (process.env.PATH ?? '').split(path.delimiter);
+    return dirs.some((dir) => dir && fs.existsSync(path.join(dir, target)));
+  };
+  const browser = findAppBrowser({ platform: process.platform, env: process.env, exists });
+  if (!browser) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(browser.command, appWindowArgs(url, { platform: process.platform, env: process.env }), { detached: true, stdio: 'ignore' });
+      // A launcher that hands the page to a browser that is already running exits with 0 at once;
+      // one that crashes exits with a signal or an error code. Staying alive means it is showing.
+      const alive = setTimeout(() => {
+        child.unref();
+        resolve(true);
+      }, 1500);
+      child.once('error', () => {
+        clearTimeout(alive);
+        resolve(false);
+      });
+      child.once('exit', (code) => {
+        clearTimeout(alive);
+        resolve(code === 0);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+function workspaceRoot(): string | undefined {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+/** A sample folder in this platform's own style, for prompts and error messages. */
+function examplePath(): string {
+  return process.platform === 'win32' ? 'C:\\Users\\you\\projects' : '/home/you/projects';
+}
+
+function isDirectory(dir: string): boolean {
+  try {
+    return fs.statSync(dir).isDirectory();
+  } catch {
+    return false;
   }
 }
 
