@@ -58,6 +58,67 @@ function isRealUserMessage(message: ChatMessage): boolean {
   return typeof message.content === 'string' || blocksOf(message).some((b) => b.type === 'text');
 }
 
+export const INTERRUPTED_TOOL_RESULT = 'This call was interrupted before its result was recorded. Check its effects before relying on them.';
+
+function toolUseIds(message: ChatMessage | undefined): string[] {
+  if (message?.role !== 'assistant') return [];
+  return blocksOf(message).flatMap((b) => (b.type === 'tool_use' ? [String(b.id)] : []));
+}
+
+/**
+ * Makes every tool_use answered by a tool_result in the very next message, and drops results that
+ * answer no call, both of which the API rejects. History ends up like this when a run is cut off
+ * mid-call (a new message sent while a command runs, a reload) or its results land after the
+ * conversation has moved on. Edits `history` in place and returns how many blocks it fixed.
+ */
+export function repairToolPairs(history: ChatMessage[]): number {
+  let fixed = 0;
+  // Results that answer nothing in the message before them, or answer a call twice.
+  for (let i = 0; i < history.length; i++) {
+    const message = history[i];
+    if (message.role !== 'user' || typeof message.content === 'string') continue;
+    const asked = new Set(toolUseIds(history[i - 1]));
+    const seen = new Set<string>();
+    const blocks = blocksOf(message);
+    const kept = blocks.filter((b) => {
+      if (b.type !== 'tool_result') return true;
+      const id = String(b.tool_use_id);
+      if (!asked.has(id) || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    if (kept.length === blocks.length) continue;
+    fixed += blocks.length - kept.length;
+    if (kept.length > 0) {
+      message.content = kept as unknown as ChatMessage['content'];
+    } else {
+      // The message after it now follows the message before it, so look at it again.
+      history.splice(i--, 1);
+    }
+  }
+  // Calls with no result.
+  for (let i = 0; i < history.length; i++) {
+    const calls = toolUseIds(history[i]);
+    if (calls.length === 0) continue;
+    const next = history[i + 1];
+    const nextBlocks = next?.role === 'user' ? blocksOf(next) : [];
+    const answered = new Set(nextBlocks.flatMap((b) => (b.type === 'tool_result' ? [String(b.tool_use_id)] : [])));
+    const missing = calls
+      .filter((id) => !answered.has(id))
+      .map((id) => ({ type: 'tool_result', tool_use_id: id, content: INTERRUPTED_TOOL_RESULT, is_error: true }));
+    if (missing.length === 0) continue;
+    fixed += missing.length;
+    if (next && answered.size > 0) {
+      next.content = [...missing, ...nextBlocks] as unknown as ChatMessage['content'];
+    } else {
+      // A message of its own, not merged into the user's: trimming cuts at the user's messages,
+      // and must not separate these results from their calls.
+      history.splice(i + 1, 0, { role: 'user', content: missing as unknown as ChatMessage['content'] });
+    }
+  }
+  return fixed;
+}
+
 export interface ManageOptions {
   /** The model's context window, in tokens. */
   windowTokens: number;

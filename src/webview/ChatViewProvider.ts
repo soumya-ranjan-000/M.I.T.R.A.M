@@ -13,11 +13,12 @@ import { gatherContext } from '../agent/gatherContext';
 import { Retrieval, Retriever } from '../agent/retrieve';
 import { resolveInWorkspace } from '../safety/workspaceGuard';
 import { pruneAttachments } from '../agent/attachments';
+import { repairToolPairs } from '../agent/contextManager';
 import { ReadResult, readAttachment } from '../agent/fileReaders';
 import { buildSubagentPrompt, buildSystemPrompt } from '../agent/SystemPrompt';
 import { createSubagentRunner } from '../agent/subagents';
 import { AnthropicProvider } from '../providers/AnthropicProvider';
-import { describeError } from '../providers/ModelProvider';
+import { ChatMessage, describeError } from '../providers/ModelProvider';
 import { CommandRuleStore } from '../storage/commandRules';
 import { SecretStore } from '../storage/secrets';
 import { Session, SessionStore, newSession, titleFrom } from '../storage/sessions';
@@ -70,6 +71,22 @@ interface Run {
   files: FileAttachment[];
   /** A resumed run: keep the earlier revert point so the whole task can be undone together. */
   continueTask?: boolean;
+  /** Already in the transcript: sent while an earlier run worked, which did not get to read it. */
+  shown?: boolean;
+}
+
+/** One run that answers several messages, as if they had been sent together. */
+function mergeRuns(runs: Run[]): Run {
+  return {
+    text: runs.map((r) => r.text).filter(Boolean).join('\n\n'),
+    includeActive: runs.some((r) => r.includeActive),
+    mentions: [...new Set(runs.flatMap((r) => r.mentions))],
+    plan: runs[0].plan,
+    images: runs.flatMap((r) => r.images),
+    files: runs.flatMap((r) => r.files),
+    continueTask: runs[0].continueTask,
+    shown: true,
+  };
 }
 
 const MODEL_KEY = 'mitram.model';
@@ -81,6 +98,8 @@ const CHANGE_QUERY = 'change:';
 const DELTA_FLUSH_MS = 40;
 /** How long the small voice window gets to load its page before the default browser is used. */
 const PAGE_LOAD_MS = 6000;
+/** How long a new message waits for the run it interrupts to stop. A command can hold its run open. */
+const STOP_WAIT_MS = 5000;
 const OTHER_MODEL = 'Enter another model or deployment name…';
 
 const FILE_EXCLUDE = '**/{node_modules,.git,dist,out,build,.vscode-test}/**';
@@ -92,6 +111,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private session: Session = newSession();
   private abort?: AbortController;
+  /** Settles when the latest run has finished. Runs share the history, so they go one at a time. */
+  private running: Promise<void> = Promise.resolve();
+  /** Runs waiting for the one before them to stop. */
+  private queuedRuns = 0;
+  /** Messages sent while a run was working, for it to read before its next step. */
+  private steering: { session: Session; run: Run; content: ChatMessage['content'] }[] = [];
   private lastRun?: Run;
   private contextWindow = 200_000;
   private readonly toolNames = new Map<string, string>();
@@ -467,21 +492,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'ready':
         await this.init();
         break;
-      case 'sendMessage':
-        await this.run(
-          {
-            text: message.text,
-            includeActive: message.includeActive,
-            mentions: message.mentions,
-            plan: message.plan,
-            images: message.images,
-            files: message.files,
-          },
-          false,
-        );
+      case 'sendMessage': {
+        const run: Run = {
+          text: message.text,
+          includeActive: message.includeActive,
+          mentions: message.mentions,
+          plan: message.plan,
+          images: message.images,
+          files: message.files,
+        };
+        if (this.canSteer(run)) await this.steer(run);
+        else await this.startRun(run, false);
         break;
+      }
       case 'retry':
-        if (this.lastRun) await this.run(this.lastRun, true);
+        if (this.lastRun) await this.startRun(this.lastRun, true);
         break;
       case 'stop':
         this.abort?.abort();
@@ -543,7 +568,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         await this.clearBoard();
         break;
       case 'continueRun':
-        await this.run(
+        await this.startRun(
           { text: 'Continue where you left off.', includeActive: false, mentions: [], plan: false, images: [], files: [], continueTask: true },
           false,
         );
@@ -604,7 +629,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.postSessions();
     this.post({ type: 'loadMessages', messages: this.session.display });
     // The view is rebuilt each time it is shown again, so restore what loadMessages resets.
-    if (this.abort) this.post({ type: 'runInProgress', since: this.runStartedAt, plan: this.runPlan });
+    if (this.abort) {
+      this.post({ type: 'runInProgress', since: this.runStartedAt, plan: this.runPlan });
+      this.postSteering();
+    }
     if (this.lastUsage?.sessionId === this.session.id) this.post(this.lastUsage.message);
     this.postCheckpoint();
     this.postBoard();
@@ -724,6 +752,98 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  /**
+   * Starts a run once the one before it has stopped. A message sent mid-run interrupts it, and the
+   * interrupted run must record its tool results before the new message is added after them.
+   */
+  private async startRun(run: Run, isRetry: boolean): Promise<void> {
+    this.abort?.abort();
+    this.resolvePending('reject');
+    const previous = this.running;
+    this.queuedRuns++;
+    const current = (async () => {
+      try {
+        await Promise.race([previous, new Promise((resolve) => setTimeout(resolve, STOP_WAIT_MS))]);
+      } finally {
+        this.queuedRuns--;
+      }
+      // Messages sent too late for a run to read them start the one after it.
+      for (let next: Run | undefined = run, retry = isRetry; next; next = this.takeLeftover(), retry = false) {
+        await this.run(next, retry);
+      }
+    })();
+    this.running = current.catch(() => undefined);
+    await current;
+  }
+
+  /** True once a newer run has taken over, or is waiting to: this one must leave the UI to it. */
+  private handedOver(abort: AbortController): boolean {
+    return this.abort !== abort || this.queuedRuns > 0;
+  }
+
+  /** A message sent while a run works on this chat goes to that run, unless it switches plan mode. */
+  private canSteer(run: Run): boolean {
+    return !!this.abort && !this.abort.signal.aborted && this.queuedRuns === 0 && run.plan === this.runPlan;
+  }
+
+  /** Hands a message to the run in progress, which reads it before its next step. */
+  private async steer(run: Run): Promise<void> {
+    const session = this.session;
+    const active = this.abort;
+    // Typed instead of answering a prompt: the waiting call is declined, and the message says what to do.
+    this.resolvePending('reject');
+    this.recordUserMessage(session, run);
+    const parts = await gatherContext({ includeActive: run.includeActive, editor: this.lastEditor, mentions: run.mentions });
+    const shown: Run = { ...run, shown: true };
+    const content = buildUserContent(run.text, parts, '', run.images, run.files);
+    if (this.abort === active && !active?.signal.aborted) {
+      this.steering.push({ session, run: shown, content });
+      this.postSteering();
+    } else if (session === this.session) {
+      // The run ended while the message was being prepared: it starts the next one.
+      await this.startRun(shown, false);
+    } else {
+      session.history.push({ role: 'user', content });
+      await this.store.save(session);
+    }
+  }
+
+  /** Removes and returns the messages waiting for a run on `session`. */
+  private takeSteering(session: Session): { run: Run; content: ChatMessage['content'] }[] {
+    const taken = this.steering.filter((s) => s.session === session);
+    if (taken.length === 0) return [];
+    this.steering = this.steering.filter((s) => s.session !== session);
+    this.postSteering();
+    return taken;
+  }
+
+  /** The run for messages a finished run did not read, if they should get one of their own. */
+  private takeLeftover(): Run | undefined {
+    const left = this.takeSteering(this.session);
+    if (left.length === 0) return undefined;
+    if (this.queuedRuns > 0) {
+      // A newer message is about to run: these go in first, so it reads everything in order.
+      for (const s of left) this.session.history.push({ role: 'user', content: s.content });
+      return undefined;
+    }
+    return mergeRuns(left.map((s) => s.run));
+  }
+
+  private postSteering(): void {
+    this.post({ type: 'steering', count: this.steering.filter((s) => s.session === this.session).length });
+  }
+
+  private recordUserMessage(session: Session, run: Run): void {
+    session.display.push({
+      role: 'user',
+      text: run.text,
+      ...(run.images.length ? { images: run.images } : {}),
+      // The transcript only shows what was attached; the content is in the history.
+      ...(run.files.length ? { files: run.files.map((f) => ({ ...f, data: '' })) } : {}),
+    });
+    if (session.display.length === 1) session.title = titleFrom(run.text || run.files[0]?.name || 'Image');
+  }
+
   private async run(run: Run, isRetry: boolean): Promise<void> {
     const settings = readSettings();
     const apiKey = await this.secrets.getApiKey();
@@ -751,6 +871,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.abort?.abort();
     const abort = new AbortController();
     this.abort = abort;
+    // Another message is already waiting behind this one: keep this message, then hand over at once.
+    if (this.queuedRuns > 0) abort.abort();
     this.runStartedAt = Date.now();
     this.runPlan = run.plan;
     this.lastRun = run;
@@ -767,6 +889,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       settings.includeEnvironment && rootForEnv ? gatherEnvironment(rootForEnv) : undefined,
     ]);
 
+    // A run cut off mid-call (by a reload, or a command that would not stop) leaves calls unanswered,
+    // and the API rejects every later request in the chat until they are.
+    const repaired = repairToolPairs(session.history);
+    if (repaired > 0) this.logger.info(`repaired ${repaired} unanswered tool call(s) or stray result(s) in the history`);
     const turnStart = session.history.length;
     // Code a keyword search matched to the message, so the model can start there instead of searching.
     const retrieved: Retrieval =
@@ -779,16 +905,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const environment = [envInfo ? formatEnvironment(envInfo) : '', retrieved.block].filter(Boolean).join('\n');
     session.history.push({ role: 'user', content: buildUserContent(run.text, parts, environment, run.images, run.files) });
     const pruned = pruneAttachments(session.history);
-    if (!isRetry) {
-      session.display.push({
-        role: 'user',
-        text: run.text,
-        ...(run.images.length ? { images: run.images } : {}),
-        // The transcript only shows what was attached; the content is in the history.
-        ...(run.files.length ? { files: run.files.map((f) => ({ ...f, data: '' })) } : {}),
-      });
-      if (session.display.length === 1) session.title = titleFrom(run.text || run.files[0]?.name || 'Image');
-    }
+    if (!isRetry && !run.shown) this.recordUserMessage(session, run);
     if (!isRetry && retrieved.files.length) {
       // Show what was attached, so the user can see what the agent started from.
       const files = retrieved.files.map(({ path, startLine, endLine }) => ({ path, startLine, endLine }));
@@ -858,6 +975,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           })
         : undefined;
 
+    // Messages sent while this run worked that it has read, so Retry can repeat them too.
+    const steered: Run[] = [];
     let pausedFor: 'steps' | 'time' | 'stuck' | undefined;
     const pausedText = { steps: 'It used all of its steps. Open the chat to continue.', time: 'It reached the time limit. Open the chat to continue.', stuck: 'It kept repeating one action. Open the chat to guide it.' };
     this.logger.info(`run start: model=${this.activeModel()} plan=${run.plan} tools=${registry.size} retry=${isRetry}`);
@@ -904,20 +1023,33 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         onFileChange: (change) => this.logChange(change),
         isAutoApproved: autoApprove,
         requestApproval: (request) => this.askApproval(session, request, abort.signal),
+        takeMessages: () =>
+          this.takeSteering(session).map(({ run, content }) => {
+            steered.push(run);
+            return { role: 'user', content };
+          }),
       });
       this.lastRun = undefined;
-      this.post({ type: 'streamEnd' });
+      // A message it did not get to read starts the next run, which keeps the working indicator.
+      const unread = this.steering.some((s) => s.session === session);
+      if (!this.handedOver(abort) && !unread) this.post({ type: 'streamEnd' });
       const ran = Date.now() - this.runStartedAt;
       if (pausedFor) void this.notifier.notify('paused', 'M.I.T.R.A.M paused', pausedText[pausedFor]);
       else void this.notifier.notify('done', 'M.I.T.R.A.M finished', session.title, ran);
     } catch (error) {
       if (abort.signal.aborted) {
         // History is kept consistent by the agent loop, so a cancelled turn is not retried.
-        this.lastRun = undefined;
-        this.post({ type: 'streamEnd' });
+        // A newer run keeps the working indicator going, so only a plain stop ends it.
+        if (!this.handedOver(abort)) {
+          this.lastRun = undefined;
+          this.post({ type: 'streamEnd' });
+        }
       } else {
         // Drop the failed turn from the model's history so Retry starts clean.
         session.history.length = turnStart;
+        // Retry asks again everything this turn was asked, including messages sent while it ran.
+        const unread = this.takeSteering(session).map((s) => s.run);
+        if (steered.length || unread.length) this.lastRun = mergeRuns([run, ...steered, ...unread]);
         const status = (error as { status?: number } | null)?.status;
         this.logger.error(`run failed: status=${status ?? 'n/a'} ${describeError(error)}`);
         this.post({
@@ -929,11 +1061,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
     } finally {
       this.flushDeltas();
-      if (this.abort === abort) this.abort = undefined;
       // Pick up the files this run changed, so the next message's search sees them.
       if (root && settings.retrieveContext) void this.retriever.warm(root);
-      this.pendingApprovals.clear();
-      this.pendingTools.clear();
+      if (this.abort === abort) {
+        // Stopped before reading them: they stay in the history, so the next request still sees them.
+        // (A newer run that has started reads them itself.)
+        if (abort.signal.aborted) for (const s of this.takeSteering(session)) session.history.push({ role: 'user', content: s.content });
+        this.abort = undefined;
+        // Only this run's prompts: a newer run that already started may be waiting on its own.
+        this.pendingApprovals.clear();
+        this.pendingTools.clear();
+      }
       await this.store.save(session);
       this.postSessions();
       this.postCheckpoint();

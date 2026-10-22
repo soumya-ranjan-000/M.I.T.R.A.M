@@ -164,6 +164,13 @@ describe('run_command', () => {
     setTimeout(() => ac.abort(), 200);
     await expect(p).rejects.toThrow(/Cancelled/);
   });
+
+  it('reports output while the command is still running', async () => {
+    const seen: string[] = [];
+    const out = await run('run_command', { command: 'echo first; sleep 1; echo second' }, { ...ctx(), progress: (o) => seen.push(o) });
+    expect(seen[0]).toBe('first\n');
+    expect(out).toMatch(/first\nsecond/);
+  });
 });
 
 describe('registry', () => {

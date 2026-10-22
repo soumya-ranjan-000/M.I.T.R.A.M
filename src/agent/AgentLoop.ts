@@ -64,6 +64,8 @@ export interface AgentOptions {
   /** Return true to run a tool that normally needs approval without asking. */
   isAutoApproved?: (tool: Tool, input: unknown) => boolean;
   requestApproval: (request: ApprovalRequest) => Promise<ApprovalDecision>;
+  /** Messages the user sent while the run was working. Called between steps; the model reads them next. */
+  takeMessages?: () => ChatMessage[];
   /**
    * Runs calls that need approval (the prompt and the call itself) one at a time across every
    * agent sharing it, so parallel sub-agents never write at once or stack up approval prompts.
@@ -89,18 +91,26 @@ export async function runAgent(options: AgentOptions): Promise<void> {
   const tracker = new RunTracker();
   const now = options.now ?? Date.now;
   const startedAt = now();
+  // The user has just said something: answer it before pausing for time.
+  let steered = false;
+  const takeMessages = (): boolean => {
+    const sent = options.takeMessages?.() ?? [];
+    history.push(...sent);
+    return sent.length > 0;
+  };
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     let text = '';
     const toolUses: ToolUse[] = [];
     let stop: StopReason = 'other';
 
-    if (options.maxRunMs && now() - startedAt >= options.maxRunMs) {
+    if (options.maxRunMs && !steered && now() - startedAt >= options.maxRunMs) {
       const minutes = Math.max(1, Math.round(options.maxRunMs / 60_000));
       onEvent({ type: 'notice', text: `Paused after ${minutes} minute${minutes === 1 ? '' : 's'}. Press Continue to keep going.` });
       onEvent({ type: 'budget', reason: 'time', steps: iteration });
       return;
     }
+    steered = false;
 
     if (options.contextWindow) {
       const trimmed = await manageContextAsync(history, {
@@ -148,13 +158,19 @@ export async function runAgent(options: AgentOptions): Promise<void> {
     for (const use of toolUses) {
       content.push({ type: 'tool_use', id: use.id, name: use.name, input: use.input });
     }
-    if (content.length > 0) history.push({ role: 'assistant', content });
+    const reply: ChatMessage = { role: 'assistant', content };
+    if (content.length > 0) history.push(reply);
 
     if (stop === 'refusal') {
       onEvent({ type: 'notice', text: 'The model declined to continue with this request.' });
       return;
     }
     if (toolUses.length === 0) {
+      // A message sent while the model was replying: answer it instead of finishing.
+      if (takeMessages()) {
+        steered = true;
+        continue;
+      }
       if (stop === 'max_tokens') {
         onEvent({ type: 'notice', text: 'The response was cut off (max tokens reached).' });
         return;
@@ -188,7 +204,10 @@ export async function runAgent(options: AgentOptions): Promise<void> {
         }
         continue;
       }
-      const runs = await Promise.all(batch.map((use) => executeTool(use, options)));
+      // Every call must get a result, even if running it fails in a way the tool did not catch.
+      const runs = await Promise.all(
+        batch.map((use) => executeTool(use, options).catch((error) => finished(use.id, (error as Error)?.message || 'Tool failed.', 'error'))),
+      );
       batch.forEach((use, i) => {
         const done = runs[i];
         const verdict = tracker.record(use.name, use.input, done.outcome, done.output, done.changed);
@@ -199,10 +218,14 @@ export async function runAgent(options: AgentOptions): Promise<void> {
         results.push(done.block);
       });
     }
-    history.push({ role: 'user', content: results });
+    // A cancelled call can take a while to stop. If a newer run has moved the history on meanwhile
+    // (and answered these calls for us), results added now would answer nothing.
+    if (history[history.length - 1] === reply) history.push({ role: 'user', content: results });
 
     if (ctx.signal.aborted) throw new AbortedError('Aborted');
-    if (stuck) {
+    steered = takeMessages();
+    // Guidance from the user is the way out of a loop, so let the model read it.
+    if (stuck && !steered) {
       onEvent({
         type: 'notice',
         text: 'Stopped: the same action kept giving the same result. Tell me how to proceed, or press Continue to let me try a different approach.',
@@ -283,7 +306,13 @@ async function executeTool(use: ToolUse, options: AgentOptions): Promise<ToolRun
   }
 
   const written = new Set<string>();
-  const ctx: ToolContext = { ...options.ctx, callId: use.id, files: reportWrites(options.ctx.files, written, use.id, options.onFileChange) };
+  const ctx: ToolContext = {
+    ...options.ctx,
+    callId: use.id,
+    files: reportWrites(options.ctx.files, written, use.id, options.onFileChange),
+    // The newest output is what matters while it runs; the result keeps the start and the end.
+    progress: (output) => onEvent({ type: 'tool_update', id: use.id, status: 'running', output: output.slice(-MAX_UI_OUTPUT_CHARS) }),
+  };
 
   let preview: ToolPreview = { summary: tool.name };
   try {

@@ -277,7 +277,8 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
   function send() {
     const trimmed = text.trim();
     const attached = images.length + files.length;
-    if ((!trimmed && attached === 0) || busy) return;
+    // Sent while the agent works, a message goes to it and is read after its current step.
+    if (!trimmed && attached === 0) return;
     const command = attached === 0 ? parseSlash(trimmed) : null;
     if (command) return runSlash(command);
     onSend(
@@ -322,6 +323,7 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
   }
 
   const fileName = activeFile ? activeFile.slice(activeFile.lastIndexOf('/') + 1) : '';
+  const hasContent = !!text.trim() || images.length > 0 || files.length > 0;
 
   return (
     <div className="composer">
@@ -394,7 +396,13 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
             aria-label="Message M.I.T.R.A.M"
             aria-controls={menuOpen ? listId : undefined}
             aria-activedescendant={menuOpen ? optionId(index) : undefined}
-            placeholder={planMode ? 'Describe what to plan. Nothing will be changed.' : 'Ask anything. Use @ to add files and / for commands'}
+            placeholder={
+              busy
+                ? 'Add to the task. The agent reads it after its current step'
+                : planMode
+                  ? 'Describe what to plan. Nothing will be changed.'
+                  : 'Ask anything. Use @ to add files and / for commands'
+            }
             rows={1}
             onChange={(e) => {
               setText(e.target.value);
@@ -450,12 +458,18 @@ export function Composer({ busy, agentState, activeFile, hasSelection, planMode,
             >
               <Icon name="mic" size={14} />
             </button>
-            {busy ? (
+            {busy && !hasContent ? (
               <button className="send-btn stop" onClick={() => postToHost({ type: 'stop' })} title="Stop (Esc)" aria-label="Stop">
                 <Icon name="stop" size={14} />
               </button>
             ) : (
-              <button className="send-btn" onClick={send} disabled={!text.trim() && images.length === 0 && files.length === 0} title="Send (Enter)" aria-label="Send">
+              <button
+                className="send-btn"
+                onClick={send}
+                disabled={!hasContent}
+                title={busy ? 'Send to the agent: it reads this after its current step (Enter). Esc stops it.' : 'Send (Enter)'}
+                aria-label="Send"
+              >
                 <Icon name="send" size={16} />
               </button>
             )}

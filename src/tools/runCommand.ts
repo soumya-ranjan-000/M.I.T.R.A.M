@@ -6,6 +6,7 @@ const DEFAULT_TIMEOUT_S = 120;
 const MAX_TIMEOUT_S = 600;
 const MAX_OUTPUT_CHARS = 30_000;
 const MAX_CAPTURE_CHARS = 1_000_000;
+const PROGRESS_INTERVAL_MS = 500;
 // Roughly what fits on a tool card's header line in a narrow side bar.
 const SUMMARY_MAX_CHARS = 40;
 
@@ -51,8 +52,16 @@ export const runCommandTool: Tool = {
 
       let output = '';
       let timedOut = false;
+      // Output arrives in many small pieces; the card is refreshed with what has come at most this often.
+      let progressTimer: NodeJS.Timeout | undefined;
       const append = (chunk: Buffer) => {
         if (output.length < MAX_CAPTURE_CHARS) output += chunk.toString('utf8');
+        if (ctx.progress && !progressTimer) {
+          progressTimer = setTimeout(() => {
+            progressTimer = undefined;
+            ctx.progress?.(output);
+          }, PROGRESS_INTERVAL_MS);
+        }
       };
       child.stdout.on('data', append);
       child.stderr.on('data', append);
@@ -74,6 +83,7 @@ export const runCommandTool: Tool = {
 
       const cleanup = () => {
         clearTimeout(timer);
+        clearTimeout(progressTimer);
         ctx.signal.removeEventListener('abort', onAbort);
       };
 

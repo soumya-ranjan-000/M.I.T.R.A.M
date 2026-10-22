@@ -75,6 +75,10 @@ export function App() {
   const [mcp, setMcp] = useState<McpState | null>(null);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [statusNote, setStatusNote] = useState('');
+  /** Messages sent mid-run that the agent has not read yet. */
+  const [steering, setSteering] = useState(0);
+  const busyRef = useRef(false);
+  busyRef.current = busy;
   const planTurn = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -108,6 +112,9 @@ export function App() {
         case 'statusNote':
           setStatusNote(msg.text);
           break;
+        case 'steering':
+          setSteering(msg.count);
+          break;
         case 'streamDelta':
         case 'thinkingDelta':
         case 'toolStart':
@@ -122,6 +129,7 @@ export function App() {
         case 'streamEnd':
           flush();
           setStatusNote('');
+          setSteering(0);
           setBusy(false);
           if (planTurn.current) setPlanReady(true);
           break;
@@ -144,6 +152,7 @@ export function App() {
           flush();
           setStatusNote('');
           setError({ message: msg.message, needsSetup: !!msg.needsSetup });
+          setSteering(0);
           setBusy(false);
           setPlanReady(false);
           break;
@@ -156,6 +165,7 @@ export function App() {
           setUsage(null);
           setPlanReady(false);
           setBudget(null);
+          setSteering(0);
           setBusy(false);
           setError(null);
           stickToBottom.current = true;
@@ -257,7 +267,8 @@ export function App() {
   const startWorking = useCallback(() => {
     stickToBottom.current = true;
     setBudget(null);
-    setBusySince(Date.now());
+    // A message sent mid-run joins that run, so its clock keeps going.
+    if (!busyRef.current) setBusySince(Date.now());
     setBusy(true);
   }, []);
 
@@ -417,7 +428,7 @@ export function App() {
           {busy && (
             <>
               {messages.length > 0 && speaker(messages[messages.length - 1]) === 'user' && <MessageHeader role="assistant" />}
-              <WorkingStatus messages={messages} since={busySince} note={statusNote} />
+              <WorkingStatus messages={messages} since={busySince} note={statusNote} queued={steering} />
             </>
           )}
 

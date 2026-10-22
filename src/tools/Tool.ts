@@ -27,6 +27,8 @@ export interface ToolContext {
   board?: BoardAccess;
   /** The id of the tool call being run. Set by the agent loop for each call. */
   callId?: string;
+  /** Shows the output so far on the call's card while it runs. Set by the agent loop for each call. */
+  progress?: (output: string) => void;
   /** Starts sub-agents for delegate_task. Not set where delegation is off, or inside a sub-agent. */
   subagents?: SubagentRunner;
 }

@@ -22,6 +22,15 @@ const STATUS_LABEL: Record<ToolCall['status'], string> = {
   rejected: 'Rejected',
 };
 
+/** How much of a running command's output shows on its card; opening the card shows all of it. */
+const LIVE_LINES = 8;
+
+function lastLines(text: string, count: number): string {
+  // Carriage returns redraw a progress line in place, so only what follows the last one is on screen.
+  const lines = text.trimEnd().split('\n').map((line) => line.slice(line.lastIndexOf('\r') + 1));
+  return lines.slice(-count).join('\n');
+}
+
 export function StatusIndicator({ status }: { status: ToolCall['status'] }) {
   const label = STATUS_LABEL[status];
   switch (status) {
@@ -146,6 +155,8 @@ export const ToolCard = memo(function ToolCard({ tool }: { tool: ToolCall }) {
           </button>
         </div>
       )}
+
+      {tool.status === 'running' && !open && tool.output && <pre className="toolcard-body live">{lastLines(tool.output, LIVE_LINES)}</pre>}
 
       {expandable && open && (
         <>

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- **Talk to the agent while it works:** type while a run is going and press Enter. The message joins the run and the agent reads it after its current step, so a running command is no longer killed to make way for it. While you are typing, Send takes the place of Stop; Esc still stops. A line under the working status shows that your message is queued until the agent picks it up. A message sent while an approval is waiting declines that action, and the message tells the agent what to do instead. Switching plan mode on or off still starts a fresh run.
+- **Live command output:** a running command's card shows its latest lines as they arrive, so long test runs and builds are no longer just a spinner. Open the card to see all of it. The agent still gets the whole output when the command finishes.
+- Fixed: a chat could get stuck on `400 … tool_use ids were found without tool_result blocks` after you sent a message while a command was running, or reloaded the window mid-run, and every later message and Retry failed with the same error. A new message now waits for the interrupted run to record its results, and a chat already stuck this way is repaired on its next message.
+- Fixed: a run that was interrupted no longer clears the next run's approval prompts or ends its working indicator.
+
 ## 0.5.0
 
 - **Atlassian sign-in with OAuth:** the Atlassian entry in the MCP panel now signs you in with your Atlassian account in the browser, as Atlassian's hosted server expects, instead of asking you to paste an API token. Pick it and approve access; there is nothing to copy. M.I.T.R.A.M registers itself with the server on the fly (OAuth 2.1 with PKCE), so no client id or secret is built in, and renews the access automatically afterwards. If the saved sign-in stops working, the server shows **Sign in** in the panel and a one-time message offers it; nothing opens a browser behind your back. **Sign out** forgets it. The sign-in is kept in VS Code's secret storage, never in settings, and only `https` sign-in pages are opened. Any other remote server that supports it can use `"auth": { "kind": "oauth" }`, or **Custom…** → **Sign in with your browser (OAuth)**. The old API-token entry is gone; a custom server can still use a token if your Atlassian admin has enabled that.

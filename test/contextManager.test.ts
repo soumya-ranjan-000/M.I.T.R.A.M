@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLEARED_TOOL_OUTPUT, REMOVED_CONTEXT, REMOVED_TURNS, SUMMARY_PREFIX, estimateMessageTokens, manageContext, manageContextAsync,
+  CLEARED_TOOL_OUTPUT, INTERRUPTED_TOOL_RESULT, REMOVED_CONTEXT, REMOVED_TURNS, SUMMARY_PREFIX, estimateMessageTokens, manageContext,
+  manageContextAsync, repairToolPairs,
 } from '../src/agent/contextManager';
 import { REMOVED_IMAGE } from '../src/agent/attachments';
 import type { ChatMessage } from '../src/providers/ModelProvider';
@@ -253,6 +254,75 @@ describe('images in the context', () => {
       { type: 'text', text: 'old question' },
     ]);
     expect(types(history[history.length - 1])).toEqual(['image', 'text']);
+    assertValid(history);
+  });
+});
+
+describe('repairToolPairs', () => {
+  const call = (...ids: string[]): ChatMessage => ({
+    role: 'assistant',
+    content: ids.map((id) => ({ type: 'tool_use' as const, id, name: 'run_command', input: { command: 'npm test' } })),
+  });
+  const results = (...ids: string[]): ChatMessage => ({
+    role: 'user',
+    content: ids.map((id) => ({ type: 'tool_result' as const, tool_use_id: id, content: 'ok' })),
+  });
+  const interrupted = (id: string) => ({ type: 'tool_result', tool_use_id: id, content: INTERRUPTED_TOOL_RESULT, is_error: true });
+
+  it('leaves a valid history alone', () => {
+    const history = [...turn(1, 10), ...turn(2, 10)];
+    const before = structuredClone(history);
+    expect(repairToolPairs(history)).toBe(0);
+    expect(history).toEqual(before);
+  });
+
+  it('answers calls cut off by a message sent while they ran', () => {
+    // The 400 seen in practice: two calls, then the next message with no results between.
+    const history: ChatMessage[] = [{ role: 'user', content: 'run the tests' }, call('a', 'b'), { role: 'user', content: 'continue' }];
+    expect(repairToolPairs(history)).toBe(2);
+    expect(history[2]).toEqual({ role: 'user', content: [interrupted('a'), interrupted('b')] });
+    // Kept apart from the user's message, which still starts its own turn.
+    expect(history[3]).toEqual({ role: 'user', content: 'continue' });
+    assertValid(history);
+  });
+
+  it('answers calls at the end of a chat saved mid-run', () => {
+    const history: ChatMessage[] = [{ role: 'user', content: 'go' }, call('a')];
+    expect(repairToolPairs(history)).toBe(1);
+    assertValid(history);
+  });
+
+  it('adds only the missing results to a partial set', () => {
+    const history: ChatMessage[] = [{ role: 'user', content: 'go' }, call('a', 'b'), results('b')];
+    expect(repairToolPairs(history)).toBe(1);
+    expect((history[2].content as any[]).map((b) => b.tool_use_id)).toEqual(['a', 'b']);
+    assertValid(history);
+  });
+
+  it('drops results that landed after the conversation moved on', () => {
+    const history: ChatMessage[] = [
+      { role: 'user', content: 'go' },
+      call('a'),
+      { role: 'user', content: 'continue' },
+      results('a'),
+      { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+    ];
+    expect(repairToolPairs(history)).toBe(2);
+    expect(history.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'user', 'assistant']);
+    expect(history[2].content).toEqual([interrupted('a')]);
+    assertValid(history);
+  });
+
+  it('drops a duplicate result but keeps the rest of its message', () => {
+    const history: ChatMessage[] = [{ role: 'user', content: 'go' }, call('a'), results('a', 'a')];
+    expect(repairToolPairs(history)).toBe(1);
+    expect(history[2]).toEqual(results('a'));
+  });
+
+  it('keeps calls and their repaired results together when old turns are trimmed', () => {
+    const history: ChatMessage[] = [...turn(0), { role: 'user', content: 'go' }, call('a'), ...turn(1), ...turn(2), ...turn(3)];
+    repairToolPairs(history);
+    manageContext(history, { windowTokens: 20_000, fixedTokens: 0 });
     assertValid(history);
   });
 });

@@ -218,6 +218,8 @@ export type HostToWebview =
   | { type: 'notice'; text: string }
   /** A passing status for the working line, such as "Connecting to MCP servers…". Not part of the transcript; empty text clears it. */
   | { type: 'statusNote'; text: string }
+  /** How many messages sent mid-run are waiting for the agent to read them after its current step. */
+  | { type: 'steering'; count: number }
   | { type: 'retrieved'; files: RetrievedRef[] }
   | { type: 'checkpoint'; files: string[] }
   | { type: 'modelInfo'; model: string }

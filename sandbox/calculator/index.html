@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Web Calculator</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="calculator">
+    <div class="topbar">
+      <button
+        class="icon-button"
+        id="history-toggle"
+        type="button"
+        aria-label="Show calculation history"
+        aria-expanded="false"
+        aria-controls="history-panel"
+        title="History"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+          <path
+            d="M12 7v5l3.5 2M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3 4.5V9h4.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <div class="display">
+      <div class="history" id="history"></div>
+      <div class="current" id="current">0</div>
+    </div>
+
+    <section class="history-panel" id="history-panel" hidden aria-label="Calculation history">
+      <div class="history-panel__head">
+        <span>History</span>
+        <button class="history-clear" id="history-clear" type="button">Clear</button>
+      </div>
+      <ul class="history-list" id="history-list"></ul>
+      <p class="history-empty" id="history-empty">No calculations yet.</p>
+    </section>
+
+    <div class="keys">
+      <button class="key fn" data-action="clear">AC</button>
+      <button class="key fn" data-action="sign">+/-</button>
+      <button class="key fn" data-action="percent">%</button>
+      <button class="key op" data-op="/">÷</button>
+
+      <button class="key" data-digit="7">7</button>
+      <button class="key" data-digit="8">8</button>
+      <button class="key" data-digit="9">9</button>
+      <button class="key op" data-op="*">×</button>
+
+      <button class="key" data-digit="4">4</button>
+      <button class="key" data-digit="5">5</button>
+      <button class="key" data-digit="6">6</button>
+      <button class="key op" data-op="-">−</button>
+
+      <button class="key" data-digit="1">1</button>
+      <button class="key" data-digit="2">2</button>
+      <button class="key" data-digit="3">3</button>
+      <button class="key op" data-op="+">+</button>
+
+      <button class="key zero" data-digit="0">0</button>
+      <button class="key" data-action="decimal">.</button>
+      <button class="key equals" data-action="equals">=</button>
+    </div>
+  </main>
+
+  <script src="calculator.js"></script>
+</body>
+</html>

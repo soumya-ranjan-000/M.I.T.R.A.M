@@ -213,6 +213,85 @@ describe('runAgent', () => {
     expect((history[2].content as any[])[0].type).toBe('tool_result');
   });
 
+  it('records a result for a call whose run throws outside the tool', async () => {
+    const { options, history } = setup(
+      [
+        [use('t1', 'create_file', { path: 'thrown.txt', content: 'x' }), stop('tool_use')],
+        [stop('end_turn')],
+      ],
+      { exclusive: async () => Promise.reject(new Error('queue broke')) },
+    );
+    await runAgent(options);
+    expect(history[2].content).toEqual([{ type: 'tool_result', tool_use_id: 't1', content: 'queue broke', is_error: true }]);
+  });
+
+  it('does not add late results once a newer run has moved the history on', async () => {
+    const { options, history, ac } = setup([[use('t1', 'create_file', { path: 'late.txt', content: 'x' }), stop('tool_use')]], {
+      requestApproval: async () => {
+        // What the next message does while this call is still stopping.
+        ac.abort();
+        history.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'interrupted' }] });
+        history.push({ role: 'user', content: 'next message' });
+        return 'reject';
+      },
+    });
+    await expect(runAgent(options)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(history.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'user']);
+    expect(history.at(-1)?.content).toBe('next message');
+  });
+
+  it('reads a message sent mid-step before its next request', async () => {
+    const inbox: ChatMessage[] = [];
+    const { options, provider } = setup(
+      [
+        [use('t1', 'read_file', { path: 'a.txt' }), stop('tool_use')],
+        [text('ok, skipping the tests'), stop('end_turn')],
+      ],
+      {
+        takeMessages: () => inbox.splice(0),
+        onEvent: (e) => {
+          if (e.type === 'tool_start') inbox.push({ role: 'user', content: 'skip the tests' });
+        },
+      },
+    );
+    await runAgent(options);
+    const second = provider.requests[1];
+    expect(second.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'user']);
+    expect((second[2].content as any[])[0].type).toBe('tool_result');
+    expect(second[3].content).toBe('skip the tests');
+  });
+
+  it('answers a message sent while the model was finishing instead of stopping', async () => {
+    const inbox: ChatMessage[] = [];
+    const { options, provider, history } = setup(
+      [
+        [text('All done.'), stop('end_turn')],
+        [text('Adding that too.'), stop('end_turn')],
+      ],
+      {
+        takeMessages: () => inbox.splice(0),
+        onEvent: (e) => {
+          if (e.type === 'text' && provider.requests.length === 1) inbox.push({ role: 'user', content: 'also update the README' });
+        },
+      },
+    );
+    await runAgent(options);
+    expect(provider.requests).toHaveLength(2);
+    expect(history.map((m) => m.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
+    expect(history[2].content).toBe('also update the README');
+  });
+
+  it('shows command output on the card while it runs', async () => {
+    const { options, events } = setup([
+      [use('t1', 'run_command', { command: 'echo live; sleep 1' }), stop('tool_use')],
+      [stop('end_turn')],
+    ]);
+    await runAgent(options);
+    const updates = events.filter((e) => e.type === 'tool_update' && e.id === 't1' && e.output !== undefined);
+    expect(updates[0]).toEqual({ type: 'tool_update', id: 't1', status: 'running', output: 'live\n' });
+    expect(updates.at(-1)).toMatchObject({ status: 'ok' });
+  });
+
   it('reports refusals', async () => {
     const { options, events } = setup([[stop('refusal')]]);
     await runAgent(options);
