@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
 import { McpServerConfig, parseServers } from '../mcp/config';
 import { NotifyMode, parseMode } from '../notifications/policy';
+import { DEFAULT_AZURE_API_VERSION } from '../providers/OpenAIProvider';
 
 export interface MitramSettings {
   endpoint: string;
   model: string;
+  /** A second, OpenAI-compatible endpoint (Azure OpenAI, OpenAI…), used for the models listed with it. */
+  openai: { endpoint: string; models: string[]; apiVersion: string };
   models: string[];
   maxTokens: number;
   maxIterations: number;
@@ -40,6 +43,11 @@ export function readSettings(): MitramSettings {
     endpoint: cfg.get<string>('endpoint', '').trim(),
     model: cfg.get<string>('model', 'claude-opus-5-5').trim(),
     models: cfg.get<string[]>('models', []),
+    openai: {
+      endpoint: cfg.get<string>('openai.endpoint', '').trim(),
+      models: cfg.get<string[]>('openai.models', []).map((m) => m.trim()).filter(Boolean),
+      apiVersion: cfg.get<string>('openai.apiVersion', DEFAULT_AZURE_API_VERSION).trim() || DEFAULT_AZURE_API_VERSION,
+    },
     maxTokens: cfg.get<number>('maxTokens', 16000),
     maxIterations: Math.max(1, cfg.get<number>('maxIterations', 60)),
     skipApprovalPrompts: cfg.get<boolean>('skipApprovalPrompts', false),

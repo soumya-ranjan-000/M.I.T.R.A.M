@@ -154,6 +154,22 @@ export function activate(context: vscode.ExtensionContext): void {
       await secrets.clearVoiceKey();
       void vscode.window.showInformationMessage('M.I.T.R.A.M: Voice API key removed.');
     }),
+    vscode.commands.registerCommand('mitram.setOpenAIApiKey', async () => {
+      const key = await vscode.window.showInputBox({
+        title: 'M.I.T.R.A.M: OpenAI API Key',
+        prompt: 'For the endpoint in mitram.openai.endpoint (Azure OpenAI or OpenAI). Stored securely in VS Code SecretStorage.',
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (key?.trim()) {
+        await secrets.setOpenAIKey(key.trim());
+        void vscode.window.showInformationMessage('M.I.T.R.A.M: OpenAI API key saved.');
+      }
+    }),
+    vscode.commands.registerCommand('mitram.clearOpenAIApiKey', async () => {
+      await secrets.clearOpenAIKey();
+      void vscode.window.showInformationMessage('M.I.T.R.A.M: OpenAI API key removed.');
+    }),
     vscode.commands.registerCommand('mitram.clearApiKey', async () => {
       await secrets.clearApiKey();
       void vscode.window.showInformationMessage('M.I.T.R.A.M: API key removed.');

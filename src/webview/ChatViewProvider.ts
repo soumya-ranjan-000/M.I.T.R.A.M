@@ -18,7 +18,8 @@ import { ReadResult, readAttachment } from '../agent/fileReaders';
 import { buildSubagentPrompt, buildSystemPrompt } from '../agent/SystemPrompt';
 import { createSubagentRunner } from '../agent/subagents';
 import { AnthropicProvider } from '../providers/AnthropicProvider';
-import { ChatMessage, describeError } from '../providers/ModelProvider';
+import { OpenAIProvider, openAIEndpointProblem, usesOpenAI } from '../providers/OpenAIProvider';
+import { ChatMessage, ModelProvider, describeError } from '../providers/ModelProvider';
 import { CommandRuleStore } from '../storage/commandRules';
 import { SecretStore } from '../storage/secrets';
 import { Session, SessionStore, newSession, titleFrom } from '../storage/sessions';
@@ -520,7 +521,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         void vscode.commands.executeCommand('workbench.action.openSettings', 'mitram');
         break;
       case 'setApiKey':
-        void vscode.commands.executeCommand('mitram.setApiKey');
+        void vscode.commands.executeCommand(usesOpenAI(readSettings(), this.activeModel()) ? 'mitram.setOpenAIApiKey' : 'mitram.setApiKey');
         break;
       case 'newChat':
         await this.newChat();
@@ -712,18 +713,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async pickModel(): Promise<void> {
     const settings = readSettings();
     const current = this.activeModel();
-    const names = [...new Set([current, settings.model, ...settings.models].filter(Boolean))];
+    const names = [...new Set([current, settings.model, ...settings.models, ...settings.openai.models].filter(Boolean))];
     const items: vscode.QuickPickItem[] = [
       ...names.map((label) => ({
         label,
-        description: label === current ? 'current' : label === settings.model ? 'from settings' : undefined,
+        description: [label === current ? 'current' : label === settings.model ? 'from settings' : '', usesOpenAI(settings, label) ? 'OpenAI endpoint' : '']
+          .filter(Boolean)
+          .join(' · ') || undefined,
       })),
       { label: '', kind: vscode.QuickPickItemKind.Separator },
       { label: OTHER_MODEL },
     ];
     const picked = await vscode.window.showQuickPick(items, {
       title: 'M.I.T.R.A.M: Choose a model',
-      placeHolder: 'Model or deployment name on your Foundry resource',
+      placeHolder: 'Model or deployment name on your Foundry or OpenAI resource',
     });
     if (!picked) return;
 
@@ -731,7 +734,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (model === OTHER_MODEL) {
       const typed = await vscode.window.showInputBox({
         title: 'Model or deployment name',
-        prompt: 'Add it to "mitram.models" to keep it in this list.',
+        prompt: 'Add it to "mitram.models" (or "mitram.openai.models" for the OpenAI endpoint) to keep it in this list.',
         value: current,
         ignoreFocusOut: true,
       });
@@ -846,26 +849,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async run(run: Run, isRetry: boolean): Promise<void> {
     const settings = readSettings();
-    const apiKey = await this.secrets.getApiKey();
-    if (!settings.endpoint || !apiKey) {
+    const model = this.activeModel();
+    const openai = usesOpenAI(settings, model);
+    const apiKey = openai ? await this.secrets.getOpenAIKey() : await this.secrets.getApiKey();
+    const problem = openai
+      ? openAIEndpointProblem(settings.openai.endpoint)
+      : !settings.endpoint
+        ? 'No endpoint configured. Set "mitram.endpoint" in your user settings to your Azure Foundry URL, or "mitram.openai.endpoint" for an OpenAI model.'
+        : null;
+    if (problem || !apiKey) {
       this.post({
         type: 'error',
-        message: !settings.endpoint
-          ? 'No endpoint configured. Set "mitram.endpoint" in your user settings to your Azure Foundry URL.'
-          : 'No API key set. Run "M.I.T.R.A.M: Set API Key".',
+        message: problem ?? `No API key set. Run "M.I.T.R.A.M: Set ${openai ? 'OpenAI ' : ''}API Key".`,
         needsSetup: true,
       });
       return;
     }
 
-    const provider = new AnthropicProvider({
-      baseURL: settings.endpoint,
-      apiKey,
-      model: this.activeModel(),
-      maxTokens: settings.maxTokens,
-      promptCaching: settings.promptCaching,
-      reasoning: settings.showReasoning,
-    });
+    const provider: ModelProvider = openai
+      ? new OpenAIProvider({
+          endpoint: settings.openai.endpoint,
+          apiKey,
+          model,
+          apiVersion: settings.openai.apiVersion,
+          maxTokens: settings.maxTokens,
+        })
+      : new AnthropicProvider({
+          baseURL: settings.endpoint,
+          apiKey,
+          model,
+          maxTokens: settings.maxTokens,
+          promptCaching: settings.promptCaching,
+          reasoning: settings.showReasoning,
+        });
 
     this.logger.addSecret(apiKey);
     this.abort?.abort();
@@ -979,7 +995,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const steered: Run[] = [];
     let pausedFor: 'steps' | 'time' | 'stuck' | undefined;
     const pausedText = { steps: 'It used all of its steps. Open the chat to continue.', time: 'It reached the time limit. Open the chat to continue.', stuck: 'It kept repeating one action. Open the chat to guide it.' };
-    this.logger.info(`run start: model=${this.activeModel()} plan=${run.plan} tools=${registry.size} retry=${isRetry}`);
+    this.logger.info(`run start: model=${model} api=${openai ? 'openai' : 'anthropic'} plan=${run.plan} tools=${registry.size} retry=${isRetry}`);
     try {
       await runAgent({
         provider,

@@ -60,6 +60,14 @@
         "title": "M.I.T.R.A.M: Clear API Key"
       },
       {
+        "command": "mitram.setOpenAIApiKey",
+        "title": "M.I.T.R.A.M: Set OpenAI API Key"
+      },
+      {
+        "command": "mitram.clearOpenAIApiKey",
+        "title": "M.I.T.R.A.M: Clear OpenAI API Key"
+      },
+      {
         "command": "mitram.initProjectInstructions",
         "title": "M.I.T.R.A.M: Create Project Instructions (MITRAM.md)"
       },
@@ -93,6 +101,25 @@
           "type": "string",
           "default": "claude-opus-5-5",
           "description": "Model or deployment name on your Foundry resource."
+        },
+        "mitram.openai.endpoint": {
+          "scope": "application",
+          "type": "string",
+          "default": "",
+          "markdownDescription": "An OpenAI-compatible endpoint for GPT and other non-Claude models: your Azure OpenAI resource, such as `https://<resource>.openai.azure.com/`, or a base URL such as `https://api.openai.com/v1`. The models in `mitram.openai.models` are sent here; if `mitram.endpoint` is empty, every model is. Must use https unless it is on this machine. Read from user settings only, so a repository cannot send your API key elsewhere. Set the key with **M.I.T.R.A.M: Set OpenAI API Key**."
+        },
+        "mitram.openai.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Models served by `mitram.openai.endpoint`: on Azure OpenAI, your deployment names, such as `gpt-5.6-sol`. They appear in the model picker, and choosing one sends the chat to that endpoint."
+        },
+        "mitram.openai.apiVersion": {
+          "type": "string",
+          "default": "2024-12-01-preview",
+          "markdownDescription": "The `api-version` sent to an Azure OpenAI resource. Not used with an `/openai/v1` URL or with other OpenAI-compatible servers."
         },
         "mitram.maxTokens": {
           "type": "number",
