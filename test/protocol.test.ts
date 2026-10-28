@@ -18,6 +18,13 @@ describe('isWebviewToHost', () => {
     expect(isWebviewToHost({ type: 'approval', id: 't', decision: 'always' })).toBe(true);
     expect(isWebviewToHost({ type: 'openFile', path: 'src/a.ts', line: 12 })).toBe(true);
     expect(isWebviewToHost({ type: 'viewChange', id: 'toolu_1' })).toBe(true);
+    expect(isWebviewToHost({ type: 'viewChatChange', path: 'src/a.ts' })).toBe(true);
+    expect(isWebviewToHost({ type: 'revertChatFile', path: 'src/a.ts' })).toBe(true);
+    expect(isWebviewToHost({ type: 'revertChat' })).toBe(true);
+    expect(isWebviewToHost({ type: 'keepChatChanges' })).toBe(true);
+    expect(isWebviewToHost({ type: 'watchProcess', id: 'p1' })).toBe(true);
+    expect(isWebviewToHost({ type: 'watchProcess' })).toBe(true);
+    expect(isWebviewToHost({ type: 'processAction', id: 'p1', action: 'restart' })).toBe(true);
   });
 
   it('rejects malformed input', () => {
@@ -26,6 +33,10 @@ describe('isWebviewToHost', () => {
     expect(isWebviewToHost({ type: 'nope' })).toBe(false);
     expect(isWebviewToHost({ type: 'viewChange' })).toBe(false);
     expect(isWebviewToHost({ type: 'viewChange', id: 5 })).toBe(false);
+    expect(isWebviewToHost({ type: 'revertChatFile' })).toBe(false);
+    expect(isWebviewToHost({ type: 'viewChatChange', path: ['a'] })).toBe(false);
+    expect(isWebviewToHost({ type: 'processAction', id: 'p1', action: 'kill -9 everything' })).toBe(false);
+    expect(isWebviewToHost({ type: 'watchProcess', id: 3 })).toBe(false);
     expect(isWebviewToHost({ type: 'sendMessage', text: 'hi' })).toBe(false);
     expect(isWebviewToHost({ type: 'sendMessage', text: 'hi', includeActive: true, mentions: [] })).toBe(false);
     expect(isWebviewToHost({ type: 'sendMessage', text: 'hi', includeActive: true, mentions: [1], plan: false })).toBe(false);

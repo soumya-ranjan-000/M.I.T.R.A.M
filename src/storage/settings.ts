@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
 import { McpServerConfig, parseServers } from '../mcp/config';
 import { NotifyMode, parseMode } from '../notifications/policy';
+import { DEFAULT_AZURE_API_VERSION } from '../providers/OpenAIProvider';
 
 export interface MitramSettings {
   endpoint: string;
   model: string;
+  /** A second, OpenAI-compatible endpoint (Azure OpenAI, OpenAI…), used for the models listed with it. */
+  openai: { endpoint: string; models: string[]; apiVersion: string };
   models: string[];
   maxTokens: number;
   maxIterations: number;
@@ -18,11 +21,15 @@ export interface MitramSettings {
   includeEnvironment: boolean;
   retrieveContext: boolean;
   showReasoning: boolean;
+  /** Fold each run of tool calls and reasoning into one line that opens on click. */
+  collapseToolCalls: boolean;
   maxRunMinutes: number;
   verifyBeforeDone: boolean;
   summarizeContext: boolean;
   subagents: boolean;
   maxParallelSubagents: number;
+  /** Chats whose agent may work at the same time; more wait their turn. */
+  maxConcurrentRuns: number;
   notifications: NotifyMode;
   voice: { provider: 'browser' | 'endpoint'; endpoint: string; model: string; language: string; compactWindow: boolean };
   /** MCP servers whose tools the agent may use, after validation. */
@@ -40,6 +47,11 @@ export function readSettings(): MitramSettings {
     endpoint: cfg.get<string>('endpoint', '').trim(),
     model: cfg.get<string>('model', 'claude-opus-5-5').trim(),
     models: cfg.get<string[]>('models', []),
+    openai: {
+      endpoint: cfg.get<string>('openai.endpoint', '').trim(),
+      models: cfg.get<string[]>('openai.models', []).map((m) => m.trim()).filter(Boolean),
+      apiVersion: cfg.get<string>('openai.apiVersion', DEFAULT_AZURE_API_VERSION).trim() || DEFAULT_AZURE_API_VERSION,
+    },
     maxTokens: cfg.get<number>('maxTokens', 16000),
     maxIterations: Math.max(1, cfg.get<number>('maxIterations', 60)),
     skipApprovalPrompts: cfg.get<boolean>('skipApprovalPrompts', false),
@@ -52,11 +64,13 @@ export function readSettings(): MitramSettings {
     includeEnvironment: cfg.get<boolean>('includeEnvironment', true),
     retrieveContext: cfg.get<boolean>('retrieveContext', true),
     showReasoning: cfg.get<boolean>('showReasoning', true),
+    collapseToolCalls: cfg.get<boolean>('collapseToolCalls', true),
     maxRunMinutes: Math.max(0, cfg.get<number>('maxRunMinutes', 20)),
     verifyBeforeDone: cfg.get<boolean>('verifyBeforeDone', true),
     summarizeContext: cfg.get<boolean>('summarizeContext', true),
     subagents: cfg.get<boolean>('subagents', true),
     maxParallelSubagents: Math.min(8, Math.max(1, Math.floor(cfg.get<number>('maxParallelSubagents', 3)))),
+    maxConcurrentRuns: Math.min(8, Math.max(1, Math.floor(cfg.get<number>('maxConcurrentRuns', 3)))),
     voice: {
       provider: cfg.get<string>('voice.provider', 'browser') === 'endpoint' ? 'endpoint' : 'browser',
       endpoint: cfg.get<string>('voice.endpoint', '').trim(),

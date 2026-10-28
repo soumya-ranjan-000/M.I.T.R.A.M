@@ -52,7 +52,7 @@ export function describeError(error: unknown): string {
   switch (e?.status) {
     case 401:
     case 403:
-      return 'Authentication failed. Check your API key with "M.I.T.R.A.M: Set API Key".';
+      return 'Authentication failed. Check your API key with "M.I.T.R.A.M: Set API Key", or "Set OpenAI API Key" for a model on the OpenAI endpoint.';
     case 404:
       return 'Not found. Check the endpoint URL and model/deployment name in settings.';
     case 429:

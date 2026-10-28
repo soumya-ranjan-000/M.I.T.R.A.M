@@ -2,6 +2,7 @@ import type { McpManager } from '../mcp/McpManager';
 import { createFileTool, editFileTool } from './editFile';
 import { getDiagnosticsTool } from './getDiagnostics';
 import { listDirTool } from './listDir';
+import { listProcessesTool, readProcessOutputTool, stopProcessTool } from './processTools';
 import { readFileTool } from './readFile';
 import { runCommandTool } from './runCommand';
 import { findFilesTool, searchFilesTool } from './searchFiles';
@@ -18,7 +19,10 @@ export function createDefaultRegistry(): ToolRegistry {
     .register(updateBoardTool)
     .register(editFileTool)
     .register(createFileTool)
-    .register(runCommandTool);
+    .register(runCommandTool)
+    .register(readProcessOutputTool)
+    .register(listProcessesTool)
+    .register(stopProcessTool);
 }
 
 /**

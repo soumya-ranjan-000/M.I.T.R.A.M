@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 const API_KEY = 'mitram.apiKey';
 const VOICE_KEY = 'mitram.voiceApiKey';
+const OPENAI_KEY = 'mitram.openaiApiKey';
 const MCP_PREFIX = 'mitram.mcpSecret.';
 const OAUTH_PREFIX = 'mitram.mcpOAuth.';
 
@@ -21,6 +22,19 @@ export class SecretStore {
 
   clearApiKey(): Thenable<void> {
     return this.secrets.delete(API_KEY);
+  }
+
+  /** The key for `mitram.openai.endpoint`. */
+  getOpenAIKey(): Thenable<string | undefined> {
+    return this.secrets.get(OPENAI_KEY);
+  }
+
+  setOpenAIKey(key: string): Thenable<void> {
+    return this.secrets.store(OPENAI_KEY, key);
+  }
+
+  clearOpenAIKey(): Thenable<void> {
+    return this.secrets.delete(OPENAI_KEY);
   }
 
   /** The key for the speech-to-text endpoint, when it needs one. */

@@ -49,6 +49,7 @@ export function buildSystemPrompt(env: PromptEnv): string {
       '- A <retrieved> block in the user\'s message lists code that a keyword search matched to it, with excerpts. Start there when it fits, but it can miss the right code or include unrelated code, so read the files before you rely on them.',
       '- Change files with edit_file (small, exact replacements) or create_file. Never rewrite a whole file to change a few lines.',
       '- Use run_command for tests, builds and linters, and get_diagnostics to check for errors after editing.',
+      '- For a dev server, watcher or anything that does not finish on its own, use run_command with background: true and check on it with read_process_output. Stop the processes you started with stop_process when they are no longer needed, unless the user wants them left running.',
       '- The user\'s approval settings determine whether edits and commands need approval. If an action is rejected, do not retry it; ask what they want instead.',
       '- Work step by step, verify your changes when you can, and stop when the task is done. Do not guess file contents or paths; look them up.',
       '- Do not run destructive or irreversible commands (deleting files, force pushes, installing global packages) unless the user asked for them.',

@@ -16,6 +16,8 @@ export type AgentEvent =
   | { type: 'thinking'; text: string }
   | { type: 'tool_start'; id: string; name: string; summary: string; detail?: string; badge?: string; status: ToolStatus }
   | { type: 'tool_update'; id: string; status: ToolStatus; output?: string }
+  /** Output a running tool produced since its last report. */
+  | { type: 'tool_output'; id: string; text: string }
   | { type: 'notice'; text: string }
   /** The run stopped early but can be continued: out of steps or time, or going in circles. */
   | { type: 'budget'; reason: 'steps' | 'time' | 'stuck'; steps: number }
@@ -306,12 +308,17 @@ async function executeTool(use: ToolUse, options: AgentOptions): Promise<ToolRun
   }
 
   const written = new Set<string>();
+  // Tools report everything so far; the card is sent only what is new.
+  let reported = 0;
   const ctx: ToolContext = {
     ...options.ctx,
     callId: use.id,
     files: reportWrites(options.ctx.files, written, use.id, options.onFileChange),
-    // The newest output is what matters while it runs; the result keeps the start and the end.
-    progress: (output) => onEvent({ type: 'tool_update', id: use.id, status: 'running', output: output.slice(-MAX_UI_OUTPUT_CHARS) }),
+    progress: (output) => {
+      const text = output.slice(reported);
+      reported = output.length;
+      if (text) onEvent({ type: 'tool_output', id: use.id, text });
+    },
   };
 
   let preview: ToolPreview = { summary: tool.name };

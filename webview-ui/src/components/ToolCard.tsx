@@ -1,7 +1,9 @@
 import { memo, useState } from 'react';
 import type { ToolCall } from '../../../src/webview/protocol';
+import { commandExit } from '../../../src/webview/steps';
 import { postToHost } from '../vscode';
 import { Icon, IconName } from './Icon';
+import { LiveLog, lastLines } from './LiveLog';
 
 const TOOL_ICONS: Record<string, IconName> = {
   read_file: 'file',
@@ -22,14 +24,11 @@ const STATUS_LABEL: Record<ToolCall['status'], string> = {
   rejected: 'Rejected',
 };
 
-/** How much of a running command's output shows on its card; opening the card shows all of it. */
-const LIVE_LINES = 8;
+/** Lines of a failed command's output left showing once it has finished. */
+const FAILED_LINES = 12;
 
-function lastLines(text: string, count: number): string {
-  // Carriage returns redraw a progress line in place, so only what follows the last one is on screen.
-  const lines = text.trimEnd().split('\n').map((line) => line.slice(line.lastIndexOf('\r') + 1));
-  return lines.slice(-count).join('\n');
-}
+/** Opens the terminals panel on a background process. The app listens for this. */
+export const OPEN_PROCESS_EVENT = 'mitram:open-process';
 
 export function StatusIndicator({ status }: { status: ToolCall['status'] }) {
   const label = STATUS_LABEL[status];
@@ -59,6 +58,9 @@ export const ToolCard = memo(function ToolCard({ tool }: { tool: ToolCall }) {
   // A finished edit opens as a diff when its card is clicked.
   const changed = tool.status === 'ok' && (tool.name === 'edit_file' || tool.name === 'create_file');
   const viewChange = () => postToHost({ type: 'viewChange', id: tool.id });
+  const exit = commandExit(tool);
+  // A command left running in the background: its card links to its log.
+  const processId = tool.name === 'run_command' ? /^Started background process (p\d+)/.exec(tool.output ?? '')?.[1] : undefined;
 
   const head = (
     <>
@@ -67,6 +69,11 @@ export const ToolCard = memo(function ToolCard({ tool }: { tool: ToolCall }) {
         {tool.summary}
       </span>
       {tool.badge && <span className="toolcard-badge">{tool.badge}</span>}
+      {exit !== null && (
+        <span className={`toolcard-exit${exit === 0 ? '' : ' failed'}`} title={`Exited with code ${exit}`}>
+          exit {exit}
+        </span>
+      )}
       <StatusIndicator status={tool.status} />
       {expandable && !changed && (
         <span className={`chevron${open ? ' open' : ''}`}>
@@ -109,6 +116,12 @@ export const ToolCard = memo(function ToolCard({ tool }: { tool: ToolCall }) {
       )}
 
       {pending && tool.detail && <pre className="toolcard-body">{tool.detail}</pre>}
+      {pending && tool.warning && (
+        <p className="toolcard-warning">
+          <Icon name="alert" size={13} />
+          <span>{tool.warning}</span>
+        </p>
+      )}
       {pending && tool.allowRule?.usesShell && (
         <p className="toolcard-warning">
           <Icon name="alert" size={13} />
@@ -156,13 +169,16 @@ export const ToolCard = memo(function ToolCard({ tool }: { tool: ToolCall }) {
         </div>
       )}
 
-      {tool.status === 'running' && !open && tool.output && <pre className="toolcard-body live">{lastLines(tool.output, LIVE_LINES)}</pre>}
-
-      {expandable && open && (
-        <>
-          {tool.detail && <pre className="toolcard-body">{tool.detail}</pre>}
-          {tool.output && <pre className="toolcard-body">{tool.output}</pre>}
-        </>
+      {expandable && open && tool.detail && <pre className="toolcard-body">{tool.detail}</pre>}
+      {tool.status === 'running' && tool.output && <LiveLog text={tool.output} />}
+      {expandable && open && tool.status !== 'running' && tool.output && <pre className="toolcard-body">{tool.output}</pre>}
+      {!open && exit !== null && exit !== 0 && tool.output && <pre className="toolcard-body">{lastLines(tool.output, FAILED_LINES)}</pre>}
+      {processId && (
+        <div className="actions">
+          <button onClick={() => window.dispatchEvent(new CustomEvent(OPEN_PROCESS_EVENT, { detail: processId }))} title="Show its live output, with buttons to stop or restart it">
+            <Icon name="terminal" size={13} /> Show {processId} in the terminals panel
+          </button>
+        </div>
       )}
     </div>
   );

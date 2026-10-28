@@ -132,6 +132,8 @@ export interface ToolCall {
   allowRule?: { label: string; usesShell: boolean };
   /** A short label shown next to the summary, e.g. "read-only" on a sub-agent or "MCP". */
   badge?: string;
+  /** Shown with an approval prompt, e.g. another chat is changing the same file. */
+  warning?: string;
 }
 
 export type DisplayMessage =
@@ -139,13 +141,53 @@ export type DisplayMessage =
   /** Files the extension's own search attached to the message above, before the model ran. */
   | { role: 'retrieved'; files: RetrievedRef[] }
   | { role: 'assistant'; text: string }
-  | { role: 'thinking'; text: string }
+  /** `startedAt` and `endedAt` are when its first and latest pieces arrived, on the host's clock. */
+  | { role: 'thinking'; text: string; startedAt?: number; endedAt?: number }
   | ({ role: 'tool' } & ToolCall & {
       /** For a sub-agent: what it is waiting for, when that is not one of its own calls. */
       note?: string;
       /** For a sub-agent: the tool calls it has made, in order. */
       steps?: ToolCall[];
     });
+
+/** A file the chat changed, compared with before the chat. Counts are missing when they are not known. */
+export interface ChangedFileView {
+  /** Workspace-relative. */
+  path: string;
+  kind: 'created' | 'modified' | 'deleted';
+  added?: number;
+  removed?: number;
+  revertible: boolean;
+}
+
+/** A background process, for the terminals panel. */
+export interface ProcessView {
+  id: string;
+  command: string;
+  status: 'running' | 'exited' | 'stopped';
+  exitCode: number | null;
+  startedAt: number;
+  endedAt?: number;
+  /** Title of the chat that started it. */
+  chat: string;
+  /** Started from the chat on screen. */
+  mine: boolean;
+}
+
+export type ProcessAction = 'stop' | 'restart' | 'terminal' | 'remove';
+const PROCESS_ACTIONS: readonly string[] = ['stop', 'restart', 'terminal', 'remove'] satisfies ProcessAction[];
+
+/** A chat other than the one on screen whose agent is working, or finished while you were away. */
+export interface TaskView {
+  /** The chat's session id. */
+  id: string;
+  title: string;
+  status: 'working' | 'waiting' | 'queued' | 'done' | 'paused' | 'error';
+  /** What it is doing, or how it ended. */
+  label: string;
+  /** When its latest run started. */
+  since: number;
+}
 
 export interface SessionSummary {
   id: string;
@@ -180,6 +222,16 @@ export type WebviewToHost =
   | { type: 'viewChange'; id: string }
   | { type: 'openFile'; path: string; line: number }
   | { type: 'revert' }
+  /** Open the diff of one file from before the chat to now. */
+  | { type: 'viewChatChange'; path: string }
+  | { type: 'revertChatFile'; path: string }
+  /** Put every file the chat changed back as it was. */
+  | { type: 'revertChat' }
+  /** Accept the chat's changes: forget them and the last turn's revert point. */
+  | { type: 'keepChatChanges' }
+  /** Stream this process's output to the panel; no id stops streaming. */
+  | { type: 'watchProcess'; id?: string }
+  | { type: 'processAction'; id: string; action: ProcessAction }
   | { type: 'pickModel' }
   | { type: 'clearBoard' }
   | { type: 'continueRun' }
@@ -207,12 +259,17 @@ export type WebviewToHost =
 
 export type HostToWebview =
   | { type: 'streamDelta'; text: string }
-  | { type: 'thinkingDelta'; text: string }
+  /** `at` is when the piece arrived, so the reasoning can say how long it took. */
+  | { type: 'thinkingDelta'; text: string; at?: number }
   | { type: 'streamEnd' }
   /** `parentId` is set for a sub-agent's call: the id of the delegate_task call that started it. */
   | { type: 'toolStart'; id: string; name: string; summary: string; detail?: string; status: ToolStatus; badge?: string; parentId?: string }
   | { type: 'toolUpdate'; id: string; status: ToolStatus; output?: string; parentId?: string }
+  /** More output from a running command, appended to its card. */
+  | { type: 'toolOutput'; id: string; text: string; parentId?: string }
   | { type: 'toolAllowRule'; id: string; label: string; usesShell: boolean; parentId?: string }
+  /** A warning for an approval prompt. */
+  | { type: 'toolWarning'; id: string; text: string; parentId?: string }
   /** Sets or clears (empty text) a sub-agent card's note. */
   | { type: 'toolNote'; id: string; note: string }
   | { type: 'notice'; text: string }
@@ -222,9 +279,21 @@ export type HostToWebview =
   | { type: 'steering'; count: number }
   | { type: 'retrieved'; files: RetrievedRef[] }
   | { type: 'checkpoint'; files: string[] }
+  /** Every file this chat changed, for the panel above the composer. */
+  | { type: 'chatChanges'; files: ChangedFileView[] }
   | { type: 'modelInfo'; model: string }
+  /** How the transcript is drawn, from the user's settings. */
+  | { type: 'displaySettings'; collapseToolCalls: boolean }
   | { type: 'board'; board: Board }
   | { type: 'budgetReached'; reason: 'steps' | 'time' | 'stuck'; steps: number }
+  /** Every background process in the window. */
+  | { type: 'processes'; list: ProcessView[] }
+  /** Output of the watched process: appended, or replacing what the panel has when `reset`. */
+  | { type: 'processOutput'; id: string; text: string; reset?: boolean }
+  /** Chats working, or finished, out of sight. */
+  | { type: 'tasks'; tasks: TaskView[] }
+  /** This chat's last run was a plan that finished while it was out of sight: offer to carry it out. */
+  | { type: 'planReady' }
   /** A run is still going for this chat: sent when the view is opened again, which resets it. */
   | { type: 'runInProgress'; since: number; plan: boolean }
   | {
@@ -268,6 +337,8 @@ const NO_PAYLOAD = new Set([
   'voiceCancel',
   'mcpRefresh',
   'mcpAdd',
+  'revertChat',
+  'keepChatChanges',
 ]);
 const STRING_FIELD: Record<string, string> = {
   switchSession: 'id',
@@ -277,6 +348,8 @@ const STRING_FIELD: Record<string, string> = {
   searchFiles: 'query',
   viewDiff: 'id',
   viewChange: 'id',
+  viewChatChange: 'path',
+  revertChatFile: 'path',
   mcpRemove: 'id',
   mcpSetKey: 'id',
   mcpSignIn: 'id',
@@ -372,6 +445,8 @@ export function isWebviewToHost(value: unknown): value is WebviewToHost {
   if (v.type === 'mcpEnable') {
     return typeof v.id === 'string' && typeof v.enabled === 'boolean';
   }
+  if (v.type === 'watchProcess') return v.id === undefined || typeof v.id === 'string';
+  if (v.type === 'processAction') return typeof v.id === 'string' && typeof v.action === 'string' && PROCESS_ACTIONS.includes(v.action);
   if (v.type === 'mcpRestart') {
     // No id means "reconnect everything".
     return v.id === undefined || typeof v.id === 'string';

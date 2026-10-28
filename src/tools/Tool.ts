@@ -1,11 +1,23 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { Board } from '../webview/protocol';
+import type { ProcessInfo, ProcessOutput } from './processes';
 
 export interface FilePort {
   readText(absPath: string): Promise<string>;
   writeText(absPath: string, content: string): Promise<void>;
   exists(absPath: string): Promise<boolean>;
   remove(absPath: string): Promise<void>;
+}
+
+/** Background processes, as seen from one chat. Every chat sees every process; `owner` says which are its own. */
+export interface ProcessPort {
+  /** The chat this port belongs to, to tell its processes from others'. */
+  owner: string;
+  /** Starts a command in the workspace root and leaves it running. */
+  start(command: string): ProcessInfo;
+  read(id: string, since?: number): ProcessOutput | undefined;
+  stop(id: string): Promise<boolean>;
+  list(): ProcessInfo[];
 }
 
 /** Read and write access to the agent's board for the current chat. */
@@ -31,6 +43,8 @@ export interface ToolContext {
   progress?: (output: string) => void;
   /** Starts sub-agents for delegate_task. Not set where delegation is off, or inside a sub-agent. */
   subagents?: SubagentRunner;
+  /** Background processes. Not set where they are not available, e.g. in tests and evals. */
+  processes?: ProcessPort;
 }
 
 /** read-only: explore and report. implement: may also edit files and run commands. */

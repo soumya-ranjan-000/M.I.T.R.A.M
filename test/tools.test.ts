@@ -177,7 +177,7 @@ describe('registry', () => {
   it('exposes every tool definition and marks mutating tools for approval', () => {
     const names = registry.definitions().map((d) => d.name).sort();
     expect(names).toEqual(
-      ['create_file', 'edit_file', 'find_files', 'get_diagnostics', 'list_dir', 'read_file', 'run_command', 'search_files', 'update_board'],
+      ['create_file', 'edit_file', 'find_files', 'get_diagnostics', 'list_dir', 'list_processes', 'read_file', 'read_process_output', 'run_command', 'search_files', 'stop_process', 'update_board'],
     );
     for (const n of ['edit_file', 'create_file', 'run_command']) expect(registry.get(n)!.requiresApproval).toBe(true);
     for (const n of ['read_file', 'list_dir', 'search_files', 'find_files', 'get_diagnostics', 'update_board']) {
@@ -189,11 +189,15 @@ describe('registry', () => {
 describe('registry.readOnly (plan mode)', () => {
   it('keeps only tools that never change anything', () => {
     const ro = registry.readOnly();
-    expect(ro.definitions().map((d) => d.name).sort()).toEqual(['find_files', 'get_diagnostics', 'list_dir', 'read_file', 'search_files', 'update_board']);
+    expect(ro.definitions().map((d) => d.name).sort()).toEqual(
+      ['find_files', 'get_diagnostics', 'list_dir', 'list_processes', 'read_file', 'read_process_output', 'search_files', 'update_board'],
+    );
     expect(ro.get('edit_file')).toBeUndefined();
     expect(ro.get('create_file')).toBeUndefined();
     expect(ro.get('run_command')).toBeUndefined();
-    expect(registry.size).toBe(9); // the original is untouched
+    // Reading a log is fine in plan mode; stopping a process is not.
+    expect(ro.get('stop_process')).toBeUndefined();
+    expect(registry.size).toBe(12); // the original is untouched
   });
 });
 

@@ -81,6 +81,8 @@ export class RunTracker {
     if ((name === 'edit_file' || name === 'create_file') && typeof path === 'string') {
       this.unverified.add(path);
     } else if (name === 'run_command') {
+      // A background start says nothing yet about whether the work is right.
+      if ((input as { background?: unknown } | null)?.background === true) return;
       const command = String((input as { command?: unknown } | null)?.command ?? '');
       if (!isVerificationCommand(command)) return;
       if (output.startsWith('exit code 0')) this.pass();

@@ -34,6 +34,16 @@ describe('SessionStore', () => {
     expect(store.activeId).toBeNull();
   });
 
+  it('saves a chat working in the background without making it the active one', async () => {
+    const store = new SessionStore(dir);
+    const shown = newSession();
+    const background = newSession();
+    await store.save(shown);
+    await store.save(background, false);
+    expect(store.activeId).toBe(shown.id);
+    expect(store.get(background.id)).toBe(background);
+  });
+
   it('survives a missing or corrupt file', async () => {
     await fs.writeFile(path.join(dir, 'sessions.json'), '{not json');
     const store = new SessionStore(dir);

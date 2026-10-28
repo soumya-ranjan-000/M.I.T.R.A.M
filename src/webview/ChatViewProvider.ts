@@ -16,14 +16,16 @@ import { pruneAttachments } from '../agent/attachments';
 import { repairToolPairs } from '../agent/contextManager';
 import { ReadResult, readAttachment } from '../agent/fileReaders';
 import { buildSubagentPrompt, buildSystemPrompt } from '../agent/SystemPrompt';
-import { createSubagentRunner } from '../agent/subagents';
+import { Slots, createSubagentRunner } from '../agent/subagents';
 import { AnthropicProvider } from '../providers/AnthropicProvider';
-import { ChatMessage, describeError } from '../providers/ModelProvider';
+import { OpenAIProvider, openAIEndpointProblem, usesOpenAI } from '../providers/OpenAIProvider';
+import { ChatMessage, ModelProvider, describeError } from '../providers/ModelProvider';
 import { CommandRuleStore } from '../storage/commandRules';
 import { SecretStore } from '../storage/secrets';
 import { Session, SessionStore, newSession, titleFrom } from '../storage/sessions';
 import { readSettings } from '../storage/settings';
 import { Checkpoint, withCheckpoint } from '../safety/checkpoints';
+import { ChatChangeStore } from '../safety/chatChanges';
 import { isAutoApproved } from '../safety/approvalPolicy';
 import {
   CommandRule,
@@ -47,7 +49,9 @@ import { createRegistry } from '../tools';
 import { createDelegateTaskTool } from '../tools/delegateTask';
 import { Tool, ToolRegistry } from '../tools/Tool';
 import { createDiagnosticsReader, createVscodeFilePort } from '../tools/vscodeHost';
-import { applyHostEvent } from './displayReducer';
+import { ProcessManager } from '../tools/processes';
+import { describeActivity } from './activity';
+import { MAX_LIVE_OUTPUT_CHARS, applyHostEvent } from './displayReducer';
 import { ChangeLog } from './changeLog';
 import { ProposalContentProvider } from './ProposalContentProvider';
 import {
@@ -58,6 +62,9 @@ import {
   MAX_FILES,
   MAX_IMAGES,
   MAX_UPLOAD_BYTES,
+  ProcessAction,
+  ProcessView,
+  TaskView,
   WebviewToHost,
   isWebviewToHost,
 } from './protocol';
@@ -89,6 +96,62 @@ function mergeRuns(runs: Run[]): Run {
   };
 }
 
+/**
+ * One chat's runs: everything that has to outlive switching to another chat, so the agent keeps
+ * working there. Each chat's runs go one at a time; different chats run side by side.
+ */
+interface ChatRun {
+  session: Session;
+  /** The run in progress, if any. */
+  abort?: AbortController;
+  /** Settles when the chat's latest run has finished. Runs share the history, so they go one at a time. */
+  running: Promise<void>;
+  /** Runs waiting for the one before them to stop. */
+  queuedRuns: number;
+  /** Messages sent while a run was working, for it to read before its next step. */
+  steering: { run: Run; content: ChatMessage['content'] }[];
+  lastRun?: Run;
+  pendingApprovals: Map<string, (d: ApprovalDecision) => void>;
+  pendingTools: Map<string, ApprovalRequest>;
+  /** Tools the user allowed for the rest of this chat. */
+  alwaysAllowed: Set<string>;
+  startedAt: number;
+  plan: boolean;
+  /** Waiting for another chat's run to finish (`mitram.maxConcurrentRuns`). */
+  queuedForSlot: boolean;
+  /** Files the run in progress wrote, so another chat's edit to one of them comes with a warning. */
+  touched: Set<string>;
+  usage?: Extract<HostToWebview, { type: 'usage' }>;
+  /** How the last run ended, shown again when the chat is opened. Cleared when the next run starts. */
+  ended?: { kind: 'done' } | { kind: 'paused'; reason: 'steps' | 'time' | 'stuck'; steps: number } | { kind: 'error'; message: string; needsSetup: boolean };
+  /** It ended while another chat was on screen and has not been opened since. */
+  unread: boolean;
+  /** The chat was deleted: its run must not save it back. */
+  deleted: boolean;
+}
+
+function newChatRun(session: Session): ChatRun {
+  return {
+    session,
+    running: Promise.resolve(),
+    queuedRuns: 0,
+    steering: [],
+    pendingApprovals: new Map(),
+    pendingTools: new Map(),
+    alwaysAllowed: new Set(),
+    startedAt: 0,
+    plan: false,
+    queuedForSlot: false,
+    touched: new Set(),
+    unread: false,
+    deleted: false,
+  };
+}
+
+const SLOT_NOTE = 'Waiting for another chat to finish…';
+/** How often the list of chats working out of sight is refreshed while they work. */
+const TASKS_THROTTLE_MS = 500;
+
 const MODEL_KEY = 'mitram.model';
 /** Steps one sub-agent may take: enough for a focused task, short of the main agent's budget. */
 const SUBAGENT_MAX_STEPS = 40;
@@ -96,6 +159,10 @@ const SUBAGENT_MAX_STEPS = 40;
 const CHANGE_QUERY = 'change:';
 /** How long streamed text is gathered before it is sent to the webview. Short enough to read as live. */
 const DELTA_FLUSH_MS = 40;
+/** How often the terminals panel gets a watched process's new output. */
+const PROCESS_FLUSH_MS = 200;
+/** How long the changed-files panel waits after an edit before reading the files again. */
+const CHANGES_DEBOUNCE_MS = 300;
 /** How long the small voice window gets to load its page before the default browser is used. */
 const PAGE_LOAD_MS = 6000;
 /** How long a new message waits for the run it interrupts to stop. A command can hold its run open. */
@@ -110,28 +177,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private session: Session = newSession();
-  private abort?: AbortController;
-  /** Settles when the latest run has finished. Runs share the history, so they go one at a time. */
-  private running: Promise<void> = Promise.resolve();
-  /** Runs waiting for the one before them to stop. */
-  private queuedRuns = 0;
-  /** Messages sent while a run was working, for it to read before its next step. */
-  private steering: { session: Session; run: Run; content: ChatMessage['content'] }[] = [];
-  private lastRun?: Run;
+  /** Run state of each chat that has run in this window, by session id. */
+  private readonly runs = new Map<string, ChatRun>();
+  /** Runs working at once across chats; more wait their turn. */
+  private readonly runSlots = new Slots(() => readSettings().maxConcurrentRuns);
+  private tasksTimer?: NodeJS.Timeout;
+  /** Commands the agent left running: dev servers, watchers. Killed when the extension stops. */
+  private readonly processes = new ProcessManager();
+  /** The process whose output the terminals panel shows, and output not yet sent to it. */
+  private watchedProcess?: string;
+  private processText = '';
+  private processTimer?: NodeJS.Timeout;
+  /** Terminals mirroring a process, so asking again shows the same one. */
+  private readonly processTerminals = new Map<string, vscode.Terminal>();
   private contextWindow = 200_000;
   private readonly toolNames = new Map<string, string>();
   private lastEditor?: vscode.TextEditor;
   private fileCache?: { at: number; files: string[] };
   private readonly retriever = new Retriever((message) => this.logger.info(message));
   private loaded?: Promise<void>;
-  private readonly pendingApprovals = new Map<string, (d: ApprovalDecision) => void>();
-  private readonly alwaysAllowed = new Set<string>();
-  private readonly pendingTools = new Map<string, ApprovalRequest>();
   private readonly checkpoints = new Map<string, Checkpoint>();
   /** What each finished edit changed, for the diff a card opens. Lost when the window reloads. */
   private readonly changes = new ChangeLog();
   private voice?: VoiceSession;
-  private pendingDelta?: { session: Session; type: 'streamDelta' | 'thinkingDelta'; text: string };
+  private pendingDelta?: { session: Session; type: 'streamDelta' | 'thinkingDelta'; text: string; at?: number };
   private deltaTimer?: NodeJS.Timeout;
   private readonly notifier = new Notifier({
     mode: () => readSettings().notifications,
@@ -139,15 +208,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     openChat: () => this.focus(),
     log: (message) => this.logger.info(message),
   });
-  // Kept for a view that is opened again mid-run: VS Code rebuilds a hidden view from scratch.
-  private runStartedAt = 0;
-  private runPlan = false;
-  private lastUsage?: { sessionId: string; message: Extract<HostToWebview, { type: 'usage' }> };
 
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly secrets: SecretStore,
     private readonly store: SessionStore,
+    private readonly chatChanges: ChatChangeStore,
     private readonly proposals: ProposalContentProvider,
     private readonly state: vscode.Memento,
     private readonly commandRules: CommandRuleStore,
@@ -158,6 +224,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly trust?: McpTrustStore,
   ) {
     this.lastEditor = pickEditor(vscode.window.activeTextEditor);
+    this.processes.onEvent((event) => {
+      if (event.type === 'output') {
+        if (event.id === this.watchedProcess) this.queueProcessOutput(event.text);
+      } else {
+        this.postProcesses();
+        // A restart starts the output afresh.
+        if (event.type === 'start' && event.info.id === this.watchedProcess) this.watchProcess(event.info.id);
+      }
+    });
     this.proposals.setResolver((uri) => {
       const m = new RegExp(`^${CHANGE_QUERY}(before|after):(.+)$`).exec(uri.query);
       const change = m ? this.changes.get(m[2]).find((c) => `/${c.path}` === uri.path) : undefined;
@@ -173,8 +248,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       vscode.window.onDidChangeTextEditorSelection((e) => {
         if (e.textEditor === this.lastEditor) this.postContextInfo();
       }),
+      // A file the chat changed was edited by hand: its line counts in the panel move too.
+      vscode.workspace.onDidSaveTextDocument((doc) => {
+        if (this.session.changes?.some((c) => c.abs === doc.uri.fsPath)) this.postChatChanges();
+      }),
+      { dispose: () => clearTimeout(this.changesTimer) },
+      { dispose: () => clearTimeout(this.tasksTimer) },
+      { dispose: () => clearTimeout(this.processTimer) },
+      { dispose: () => this.processes.dispose() },
+      vscode.window.onDidCloseTerminal((t) => {
+        for (const [id, terminal] of this.processTerminals) if (terminal === t) this.processTerminals.delete(id);
+      }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('mitram.model')) this.postModel();
+        if (e.affectsConfiguration('mitram.collapseToolCalls')) this.postDisplaySettings();
         // Reconnect when the servers change, so edits to settings.json take effect without a reload.
         if (e.affectsConfiguration('mitram.mcpServers')) void this.refreshMcp();
       }),
@@ -424,17 +511,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     void vscode.commands.executeCommand(`${ChatViewProvider.viewType}.focus`);
   }
 
+  /** Opens an empty chat. A run in the chat being left keeps going. */
   async newChat(): Promise<void> {
-    this.abort?.abort();
-    this.resolvePending('reject');
-    this.alwaysAllowed.clear();
     this.session = newSession();
-    this.lastRun = undefined;
     await this.store.setActive(null);
-    this.postSessions();
-    this.post({ type: 'loadMessages', messages: [] });
-    this.postBoard();
-    this.postCheckpoint();
+    this.showSession();
+  }
+
+  /** The run state of a chat, created the first time it is needed. */
+  private chatRun(session: Session): ChatRun {
+    let chat = this.runs.get(session.id);
+    if (!chat) {
+      chat = newChatRun(session);
+      this.runs.set(session.id, chat);
+    }
+    return chat;
+  }
+
+  /** Posts to the webview only while this chat is the one on screen. */
+  private postFor(session: Session, message: HostToWebview): void {
+    if (session === this.session) this.post(message);
   }
 
   post(message: HostToWebview): void {
@@ -456,6 +552,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.flushDeltas();
     session.display = applyHostEvent(session.display, event);
     if (session === this.session) this.send(event);
+    // What a chat out of sight is doing shows in the task list.
+    else this.postTasks();
   }
 
   /**
@@ -466,8 +564,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private queueDelta(session: Session, event: Extract<HostToWebview, { type: 'streamDelta' | 'thinkingDelta' }>): void {
     const pending = this.pendingDelta;
     if (pending && (pending.session !== session || pending.type !== event.type)) this.flushDeltas();
-    if (this.pendingDelta) this.pendingDelta.text += event.text;
-    else this.pendingDelta = { session, type: event.type, text: event.text };
+    const at = event.type === 'thinkingDelta' ? event.at : undefined;
+    if (this.pendingDelta) {
+      this.pendingDelta.text += event.text;
+      this.pendingDelta.at = at ?? this.pendingDelta.at;
+    } else {
+      this.pendingDelta = { session, type: event.type, text: event.text, at };
+    }
     this.deltaTimer ??= setTimeout(() => this.flushDeltas(), DELTA_FLUSH_MS);
   }
 
@@ -477,14 +580,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const pending = this.pendingDelta;
     if (!pending) return;
     this.pendingDelta = undefined;
-    const event = { type: pending.type, text: pending.text };
+    const event: HostToWebview =
+      pending.type === 'thinkingDelta' ? { type: 'thinkingDelta', text: pending.text, at: pending.at } : { type: 'streamDelta', text: pending.text };
     pending.session.display = applyHostEvent(pending.session.display, event);
     if (pending.session === this.session) this.send(event);
   }
 
-  private resolvePending(decision: ApprovalDecision): void {
-    for (const resolve of this.pendingApprovals.values()) resolve(decision);
-    this.pendingApprovals.clear();
+  private resolvePending(chat: ChatRun, decision: ApprovalDecision): void {
+    for (const resolve of chat.pendingApprovals.values()) resolve(decision);
+    chat.pendingApprovals.clear();
   }
 
   private async handle(message: WebviewToHost): Promise<void> {
@@ -501,26 +605,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           images: message.images,
           files: message.files,
         };
-        if (this.canSteer(run)) await this.steer(run);
-        else await this.startRun(run, false);
+        const chat = this.chatRun(this.session);
+        if (this.canSteer(chat, run)) await this.steer(chat, run);
+        else await this.startRun(this.session, run, false);
         break;
       }
-      case 'retry':
-        if (this.lastRun) await this.startRun(this.lastRun, true);
+      case 'retry': {
+        const last = this.runs.get(this.session.id)?.lastRun;
+        if (last) await this.startRun(this.session, last, true);
         break;
-      case 'stop':
-        this.abort?.abort();
-        this.resolvePending('reject');
+      }
+      case 'stop': {
+        // Only the chat on screen: others keep working.
+        const chat = this.runs.get(this.session.id);
+        if (chat) {
+          chat.abort?.abort();
+          this.resolvePending(chat, 'reject');
+        }
         break;
-      case 'approval':
-        this.pendingApprovals.get(message.id)?.(message.decision);
-        this.pendingApprovals.delete(message.id);
+      }
+      case 'approval': {
+        const pending = this.runs.get(this.session.id)?.pendingApprovals;
+        pending?.get(message.id)?.(message.decision);
+        pending?.delete(message.id);
         break;
+      }
       case 'openSettings':
         void vscode.commands.executeCommand('workbench.action.openSettings', 'mitram');
         break;
       case 'setApiKey':
-        void vscode.commands.executeCommand('mitram.setApiKey');
+        void vscode.commands.executeCommand(usesOpenAI(readSettings(), this.activeModel()) ? 'mitram.setOpenAIApiKey' : 'mitram.setApiKey');
         break;
       case 'newChat':
         await this.newChat();
@@ -564,11 +678,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'revert':
         await this.revert();
         break;
+      case 'viewChatChange':
+        await this.viewChatChange(message.path);
+        break;
+      case 'revertChatFile':
+        await this.revertChat(message.path);
+        break;
+      case 'revertChat':
+        await this.revertChat();
+        break;
+      case 'keepChatChanges':
+        await this.keepChatChanges();
+        break;
+      case 'watchProcess':
+        this.watchProcess(message.id);
+        break;
+      case 'processAction':
+        await this.processAction(message.id, message.action);
+        break;
       case 'clearBoard':
         await this.clearBoard();
         break;
       case 'continueRun':
         await this.startRun(
+          this.session,
           { text: 'Continue where you left off.', includeActive: false, mentions: [], plan: false, images: [], files: [], continueTask: true },
           false,
         );
@@ -621,45 +754,108 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.loaded ??= this.store.load().then(() => {
       const active = this.store.activeId ? this.store.get(this.store.activeId) : undefined;
       if (active) this.session = active;
+      // Earlier content kept for chats that have since been deleted or dropped from the list.
+      void this.chatChanges.prune(this.store.list().map((s) => s.id));
     });
     await this.loaded;
     // Build the code index while the user types, so the first message doesn't wait for it.
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (root && readSettings().retrieveContext) void this.retriever.warm(root);
-    this.postSessions();
-    this.post({ type: 'loadMessages', messages: this.session.display });
-    // The view is rebuilt each time it is shown again, so restore what loadMessages resets.
-    if (this.abort) {
-      this.post({ type: 'runInProgress', since: this.runStartedAt, plan: this.runPlan });
-      this.postSteering();
-    }
-    if (this.lastUsage?.sessionId === this.session.id) this.post(this.lastUsage.message);
-    this.postCheckpoint();
-    this.postBoard();
+    // The view is rebuilt each time it is shown again, so everything is sent afresh.
+    this.showSession();
     this.postContextInfo();
     this.postModel();
+    this.postDisplaySettings();
   }
 
+  private postDisplaySettings(): void {
+    this.post({ type: 'displaySettings', collapseToolCalls: readSettings().collapseToolCalls });
+  }
+
+  /** Shows another chat. A run in the chat being left keeps going. */
   private async switchSession(id: string): Promise<void> {
     const target = this.store.get(id);
     if (!target) return;
-    this.abort?.abort();
-    this.resolvePending('reject');
     this.session = target;
-    this.lastRun = undefined;
     await this.store.setActive(id);
+    this.showSession();
+  }
+
+  /** Sends everything the webview shows for the chat on screen, after a switch or when the view is rebuilt. */
+  private showSession(): void {
     this.postSessions();
-    this.post({ type: 'loadMessages', messages: target.display });
+    this.post({ type: 'loadMessages', messages: this.session.display });
+    this.postRunState();
     this.postBoard();
     this.postCheckpoint();
+    this.postChatChanges();
+    this.postTasks();
+    // Whether a process is "this chat's" depends on the chat on screen.
+    this.postProcesses();
+  }
+
+  /** Restores what loadMessages resets: a run still going, how the last one ended, and usage. */
+  private postRunState(): void {
+    const chat = this.runs.get(this.session.id);
+    if (!chat) return;
+    chat.unread = false;
+    if (chat.usage) this.post(chat.usage);
+    if (chat.abort) {
+      this.post({ type: 'runInProgress', since: chat.startedAt, plan: chat.plan });
+      if (chat.queuedForSlot) this.post({ type: 'statusNote', text: SLOT_NOTE });
+      this.postSteering(chat);
+      return;
+    }
+    const ended = chat.ended;
+    if (ended?.kind === 'error') this.post({ type: 'error', message: ended.message, needsSetup: ended.needsSetup });
+    else if (ended?.kind === 'paused') this.post({ type: 'budgetReached', reason: ended.reason, steps: ended.steps });
+    else if (ended?.kind === 'done' && chat.plan) this.post({ type: 'planReady' });
+  }
+
+  /** Sends the chats working, or finished, out of sight. Called often while they work, so throttled. */
+  private postTasks(): void {
+    this.tasksTimer ??= setTimeout(() => {
+      this.tasksTimer = undefined;
+      this.sendTasks();
+    }, TASKS_THROTTLE_MS);
+  }
+
+  private sendTasks(): void {
+    const tasks: TaskView[] = [];
+    for (const chat of this.runs.values()) {
+      if (chat.session === this.session || chat.deleted) continue;
+      const { session, ended } = chat;
+      const base = { id: session.id, title: session.title, since: chat.startedAt };
+      if (chat.abort) {
+        const activity = describeActivity(session.display);
+        if (chat.queuedForSlot) tasks.push({ ...base, status: 'queued', label: SLOT_NOTE });
+        else tasks.push({ ...base, status: activity.waitingForUser ? 'waiting' : 'working', label: activity.label });
+      } else if (chat.unread && ended) {
+        if (ended.kind === 'error') tasks.push({ ...base, status: 'error', label: ended.message });
+        else if (ended.kind === 'paused') tasks.push({ ...base, status: 'paused', label: 'Paused: open the chat to continue' });
+        else tasks.push({ ...base, status: 'done', label: chat.plan ? 'Plan ready' : 'Finished' });
+      }
+    }
+    this.post({ type: 'tasks', tasks });
   }
 
   private async deleteSession(id: string): Promise<void> {
+    const chat = this.runs.get(id);
+    if (chat) {
+      chat.deleted = true;
+      chat.abort?.abort();
+      this.resolvePending(chat, 'reject');
+      this.runs.delete(id);
+    }
+    // Its dev servers and watchers go with it.
+    void this.processes.stopOwner(id);
     await this.store.delete(id);
+    void this.chatChanges.remove(id);
     if (this.session.id === id) {
       await this.newChat();
     } else {
       this.postSessions();
+      this.postTasks();
     }
   }
 
@@ -712,18 +908,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private async pickModel(): Promise<void> {
     const settings = readSettings();
     const current = this.activeModel();
-    const names = [...new Set([current, settings.model, ...settings.models].filter(Boolean))];
+    const names = [...new Set([current, settings.model, ...settings.models, ...settings.openai.models].filter(Boolean))];
     const items: vscode.QuickPickItem[] = [
       ...names.map((label) => ({
         label,
-        description: label === current ? 'current' : label === settings.model ? 'from settings' : undefined,
+        description: [label === current ? 'current' : label === settings.model ? 'from settings' : '', usesOpenAI(settings, label) ? 'OpenAI endpoint' : '']
+          .filter(Boolean)
+          .join(' · ') || undefined,
       })),
       { label: '', kind: vscode.QuickPickItemKind.Separator },
       { label: OTHER_MODEL },
     ];
     const picked = await vscode.window.showQuickPick(items, {
       title: 'M.I.T.R.A.M: Choose a model',
-      placeHolder: 'Model or deployment name on your Foundry resource',
+      placeHolder: 'Model or deployment name on your Foundry or OpenAI resource',
     });
     if (!picked) return;
 
@@ -731,7 +929,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (model === OTHER_MODEL) {
       const typed = await vscode.window.showInputBox({
         title: 'Model or deployment name',
-        prompt: 'Add it to "mitram.models" to keep it in this list.',
+        prompt: 'Add it to "mitram.models" (or "mitram.openai.models" for the OpenAI endpoint) to keep it in this list.',
         value: current,
         ignoreFocusOut: true,
       });
@@ -756,81 +954,79 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
    * Starts a run once the one before it has stopped. A message sent mid-run interrupts it, and the
    * interrupted run must record its tool results before the new message is added after them.
    */
-  private async startRun(run: Run, isRetry: boolean): Promise<void> {
-    this.abort?.abort();
-    this.resolvePending('reject');
-    const previous = this.running;
-    this.queuedRuns++;
+  private async startRun(session: Session, run: Run, isRetry: boolean): Promise<void> {
+    const chat = this.chatRun(session);
+    chat.abort?.abort();
+    this.resolvePending(chat, 'reject');
+    const previous = chat.running;
+    chat.queuedRuns++;
     const current = (async () => {
       try {
         await Promise.race([previous, new Promise((resolve) => setTimeout(resolve, STOP_WAIT_MS))]);
       } finally {
-        this.queuedRuns--;
+        chat.queuedRuns--;
       }
       // Messages sent too late for a run to read them start the one after it.
-      for (let next: Run | undefined = run, retry = isRetry; next; next = this.takeLeftover(), retry = false) {
-        await this.run(next, retry);
+      for (let next: Run | undefined = run, retry = isRetry; next; next = this.takeLeftover(chat), retry = false) {
+        await this.run(session, next, retry);
       }
     })();
-    this.running = current.catch(() => undefined);
+    chat.running = current.catch(() => undefined);
     await current;
   }
 
-  /** True once a newer run has taken over, or is waiting to: this one must leave the UI to it. */
-  private handedOver(abort: AbortController): boolean {
-    return this.abort !== abort || this.queuedRuns > 0;
+  /** True once a newer run of the same chat has taken over, or is waiting to: this one must leave the UI to it. */
+  private handedOver(chat: ChatRun, abort: AbortController): boolean {
+    return chat.abort !== abort || chat.queuedRuns > 0;
   }
 
   /** A message sent while a run works on this chat goes to that run, unless it switches plan mode. */
-  private canSteer(run: Run): boolean {
-    return !!this.abort && !this.abort.signal.aborted && this.queuedRuns === 0 && run.plan === this.runPlan;
+  private canSteer(chat: ChatRun, run: Run): boolean {
+    return !!chat.abort && !chat.abort.signal.aborted && chat.queuedRuns === 0 && run.plan === chat.plan;
   }
 
   /** Hands a message to the run in progress, which reads it before its next step. */
-  private async steer(run: Run): Promise<void> {
-    const session = this.session;
-    const active = this.abort;
+  private async steer(chat: ChatRun, run: Run): Promise<void> {
+    const { session } = chat;
+    const active = chat.abort;
     // Typed instead of answering a prompt: the waiting call is declined, and the message says what to do.
-    this.resolvePending('reject');
+    this.resolvePending(chat, 'reject');
     this.recordUserMessage(session, run);
     const parts = await gatherContext({ includeActive: run.includeActive, editor: this.lastEditor, mentions: run.mentions });
     const shown: Run = { ...run, shown: true };
     const content = buildUserContent(run.text, parts, '', run.images, run.files);
-    if (this.abort === active && !active?.signal.aborted) {
-      this.steering.push({ session, run: shown, content });
-      this.postSteering();
-    } else if (session === this.session) {
-      // The run ended while the message was being prepared: it starts the next one.
-      await this.startRun(shown, false);
+    if (chat.abort === active && !active?.signal.aborted) {
+      chat.steering.push({ run: shown, content });
+      this.postSteering(chat);
     } else {
-      session.history.push({ role: 'user', content });
-      await this.store.save(session);
+      // The run ended while the message was being prepared: it starts the next one.
+      await this.startRun(session, shown, false);
     }
   }
 
-  /** Removes and returns the messages waiting for a run on `session`. */
-  private takeSteering(session: Session): { run: Run; content: ChatMessage['content'] }[] {
-    const taken = this.steering.filter((s) => s.session === session);
+  /** Removes and returns the messages waiting for the chat's run. */
+  private takeSteering(chat: ChatRun): { run: Run; content: ChatMessage['content'] }[] {
+    const taken = chat.steering;
     if (taken.length === 0) return [];
-    this.steering = this.steering.filter((s) => s.session !== session);
-    this.postSteering();
+    chat.steering = [];
+    this.postSteering(chat);
     return taken;
   }
 
   /** The run for messages a finished run did not read, if they should get one of their own. */
-  private takeLeftover(): Run | undefined {
-    const left = this.takeSteering(this.session);
+  private takeLeftover(chat: ChatRun): Run | undefined {
+    const left = this.takeSteering(chat);
     if (left.length === 0) return undefined;
-    if (this.queuedRuns > 0) {
+    if (chat.queuedRuns > 0) {
       // A newer message is about to run: these go in first, so it reads everything in order.
-      for (const s of left) this.session.history.push({ role: 'user', content: s.content });
+      for (const s of left) chat.session.history.push({ role: 'user', content: s.content });
       return undefined;
     }
     return mergeRuns(left.map((s) => s.run));
   }
 
-  private postSteering(): void {
-    this.post({ type: 'steering', count: this.steering.filter((s) => s.session === this.session).length });
+  private postSteering(chat: ChatRun): void {
+    this.postFor(chat.session, { type: 'steering', count: chat.steering.length });
   }
 
   private recordUserMessage(session: Session, run: Run): void {
@@ -844,41 +1040,53 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (session.display.length === 1) session.title = titleFrom(run.text || run.files[0]?.name || 'Image');
   }
 
-  private async run(run: Run, isRetry: boolean): Promise<void> {
+  private async run(session: Session, run: Run, isRetry: boolean): Promise<void> {
+    const chat = this.chatRun(session);
     const settings = readSettings();
-    const apiKey = await this.secrets.getApiKey();
-    if (!settings.endpoint || !apiKey) {
-      this.post({
-        type: 'error',
-        message: !settings.endpoint
-          ? 'No endpoint configured. Set "mitram.endpoint" in your user settings to your Azure Foundry URL.'
-          : 'No API key set. Run "M.I.T.R.A.M: Set API Key".',
-        needsSetup: true,
-      });
+    const model = this.activeModel();
+    const openai = usesOpenAI(settings, model);
+    const apiKey = openai ? await this.secrets.getOpenAIKey() : await this.secrets.getApiKey();
+    const problem = openai
+      ? openAIEndpointProblem(settings.openai.endpoint)
+      : !settings.endpoint
+        ? 'No endpoint configured. Set "mitram.endpoint" in your user settings to your Azure Foundry URL, or "mitram.openai.endpoint" for an OpenAI model.'
+        : null;
+    if (problem || !apiKey) {
+      this.failRun(chat, problem ?? `No API key set. Run "M.I.T.R.A.M: Set ${openai ? 'OpenAI ' : ''}API Key".`, true);
       return;
     }
 
-    const provider = new AnthropicProvider({
-      baseURL: settings.endpoint,
-      apiKey,
-      model: this.activeModel(),
-      maxTokens: settings.maxTokens,
-      promptCaching: settings.promptCaching,
-      reasoning: settings.showReasoning,
-    });
+    const provider: ModelProvider = openai
+      ? new OpenAIProvider({
+          endpoint: settings.openai.endpoint,
+          apiKey,
+          model,
+          apiVersion: settings.openai.apiVersion,
+          maxTokens: settings.maxTokens,
+        })
+      : new AnthropicProvider({
+          baseURL: settings.endpoint,
+          apiKey,
+          model,
+          maxTokens: settings.maxTokens,
+          promptCaching: settings.promptCaching,
+          reasoning: settings.showReasoning,
+        });
 
     this.logger.addSecret(apiKey);
-    this.abort?.abort();
+    chat.abort?.abort();
     const abort = new AbortController();
-    this.abort = abort;
+    chat.abort = abort;
     // Another message is already waiting behind this one: keep this message, then hand over at once.
-    if (this.queuedRuns > 0) abort.abort();
-    this.runStartedAt = Date.now();
-    this.runPlan = run.plan;
-    this.lastRun = run;
+    if (chat.queuedRuns > 0) abort.abort();
+    chat.startedAt = Date.now();
+    chat.plan = run.plan;
+    chat.lastRun = run;
+    chat.ended = undefined;
+    chat.touched.clear();
+    this.postTasks();
 
     this.contextWindow = settings.contextWindow;
-    const session = this.session;
     const rootForEnv = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     // Everything below is independent of the rest, and any of it can be slow (starting an MCP
     // server can take many seconds), so it all starts now and is awaited where it is needed.
@@ -906,6 +1114,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     session.history.push({ role: 'user', content: buildUserContent(run.text, parts, environment, run.images, run.files) });
     const pruned = pruneAttachments(session.history);
     if (!isRetry && !run.shown) this.recordUserMessage(session, run);
+    // Saved now, not when the run ends, so the chat is in the history list while it works and can be
+    // opened again after switching away.
+    if (!this.store.get(session.id)) void this.store.save(session, session === this.session).then(() => this.postSessions());
     if (!isRetry && retrieved.files.length) {
       // Show what was attached, so the user can see what the agent started from.
       const files = retrieved.files.map(({ path, startLine, endLine }) => ({ path, startLine, endLine }));
@@ -921,9 +1132,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
     // Connects MCP servers on the first run that needs them; a failed server costs only its tools.
     // Shown on the working line only while it lasts: it is not part of the conversation.
-    if (root && this.mcp?.configured) this.post({ type: 'statusNote', text: 'Connecting to MCP servers…' });
+    if (root && this.mcp?.configured) this.postFor(session, { type: 'statusNote', text: 'Connecting to MCP servers…' });
     const fullRegistry = registryPromise ? await registryPromise : new ToolRegistry();
-    if (root && this.mcp?.configured) this.post({ type: 'statusNote', text: '' });
+    if (root && this.mcp?.configured) this.postFor(session, { type: 'statusNote', text: '' });
     this.offerSignIn();
     if (root && this.mcp?.configured) this.postMcpStatus();
     // Plan mode: read-only tools, so nothing can change until the user approves the plan.
@@ -954,7 +1165,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           autoApproveMcpReads: settings.autoApproveMcpReads,
           mcpReadOnlyTools: this.mcp?.readOnlyToolNames(),
         },
-        this.alwaysAllowed,
+        chat.alwaysAllowed,
       );
     const subagents =
       useSubagents && root
@@ -968,9 +1179,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             summarizeContext: settings.summarizeContext,
             onEvent: (parentId, event) => this.onSubagentEvent(session, parentId, event),
             onNote: (id, note) => this.emit(session, { type: 'toolNote', id, note }),
-            onFileChange: (change) => this.logChange(change),
+            onFileChange: (change) => this.logChange(session, change),
             isAutoApproved: autoApprove,
-            requestApproval: (request, parentId) => this.askApproval(session, request, abort.signal, parentId),
+            requestApproval: (request, parentId) => this.askApproval(chat, request, abort.signal, parentId),
             log: (message) => this.logger.info(message),
           })
         : undefined;
@@ -978,104 +1189,152 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Messages sent while this run worked that it has read, so Retry can repeat them too.
     const steered: Run[] = [];
     let pausedFor: 'steps' | 'time' | 'stuck' | undefined;
+    let pausedSteps = 0;
     const pausedText = { steps: 'It used all of its steps. Open the chat to continue.', time: 'It reached the time limit. Open the chat to continue.', stuck: 'It kept repeating one action. Open the chat to guide it.' };
-    this.logger.info(`run start: model=${this.activeModel()} plan=${run.plan} tools=${registry.size} retry=${isRetry}`);
+    this.logger.info(`run start: model=${model} api=${openai ? 'openai' : 'anthropic'} plan=${run.plan} tools=${registry.size} retry=${isRetry}`);
     try {
-      await runAgent({
-        provider,
-        system: buildSystemPrompt({
-          root,
-          platform: process.platform,
-          date,
-          projectInstructions,
-          planMode: run.plan,
-          subagents: useSubagents,
-          // Only servers that actually connected: naming one with no tools would mislead the model.
-          mcpServers: this.mcp?.status().filter((s) => s.status === 'ready' && s.toolCount > 0).map((s) => s.id),
-        }),
-        history: session.history,
-        registry,
-        ctx: {
-          root: root ?? '',
-          signal: abort.signal,
-          files: withCheckpoint(createVscodeFilePort(), checkpoint),
-          diagnostics: root ? createDiagnosticsReader(root) : undefined,
-          blockedCommandPatterns: compilePatterns(settings.blockedCommandPatterns),
-          board: {
-            get: () => session.board ?? emptyBoard(),
-            set: (board) => {
-              session.board = board;
-              if (session === this.session) this.post({ type: 'board', board });
-            },
-          },
-          subagents,
-        },
-        maxIterations: settings.maxIterations,
-        maxRunMs: settings.maxRunMinutes * 60_000,
-        verifyBeforeDone: settings.verifyBeforeDone,
-        summarizeContext: settings.summarizeContext,
-        getBoard: () => session.board ?? emptyBoard(),
-        contextWindow: settings.contextWindow,
-        onEvent: (event) => {
-          if (event.type === 'budget') pausedFor = event.reason;
-          this.onAgentEvent(session, event);
-        },
-        onFileChange: (change) => this.logChange(change),
-        isAutoApproved: autoApprove,
-        requestApproval: (request) => this.askApproval(session, request, abort.signal),
-        takeMessages: () =>
-          this.takeSteering(session).map(({ run, content }) => {
-            steered.push(run);
-            return { role: 'user', content };
+      if (!this.runSlots.free) {
+        chat.queuedForSlot = true;
+        this.postFor(session, { type: 'statusNote', text: SLOT_NOTE });
+        this.postTasks();
+      }
+      // Past mitram.maxConcurrentRuns, the run waits here for another chat's to finish.
+      await this.runSlots.use(abort.signal, async () => {
+        if (chat.queuedForSlot) {
+          chat.queuedForSlot = false;
+          this.postFor(session, { type: 'statusNote', text: '' });
+          this.postTasks();
+        }
+        await runAgent({
+          provider,
+          system: buildSystemPrompt({
+            root,
+            platform: process.platform,
+            date,
+            projectInstructions,
+            planMode: run.plan,
+            subagents: useSubagents,
+            // Only servers that actually connected: naming one with no tools would mislead the model.
+            mcpServers: this.mcp?.status().filter((s) => s.status === 'ready' && s.toolCount > 0).map((s) => s.id),
           }),
+          history: session.history,
+          registry,
+          ctx: {
+            root: root ?? '',
+            signal: abort.signal,
+            files: withCheckpoint(createVscodeFilePort(), checkpoint),
+            diagnostics: root ? createDiagnosticsReader(root) : undefined,
+            blockedCommandPatterns: compilePatterns(settings.blockedCommandPatterns),
+            board: {
+              get: () => session.board ?? emptyBoard(),
+              set: (board) => {
+                session.board = board;
+                if (session === this.session) this.post({ type: 'board', board });
+              },
+            },
+            subagents,
+            processes: root
+              ? {
+                  owner: session.id,
+                  start: (command) => this.processes.start(command, root, session.id),
+                  read: (id, since) => this.processes.read(id, since),
+                  stop: (id) => this.processes.stop(id),
+                  list: () => this.processes.list(),
+                }
+              : undefined,
+          },
+          maxIterations: settings.maxIterations,
+          maxRunMs: settings.maxRunMinutes * 60_000,
+          verifyBeforeDone: settings.verifyBeforeDone,
+          summarizeContext: settings.summarizeContext,
+          getBoard: () => session.board ?? emptyBoard(),
+          contextWindow: settings.contextWindow,
+          onEvent: (event) => {
+            if (event.type === 'budget') {
+              pausedFor = event.reason;
+              pausedSteps = event.steps;
+            }
+            this.onAgentEvent(session, event);
+          },
+          onFileChange: (change) => this.logChange(session, change),
+          isAutoApproved: autoApprove,
+          requestApproval: (request) => this.askApproval(chat, request, abort.signal),
+          takeMessages: () =>
+            this.takeSteering(chat).map(({ run, content }) => {
+              steered.push(run);
+              return { role: 'user', content };
+            }),
+        });
       });
-      this.lastRun = undefined;
+      chat.lastRun = undefined;
       // A message it did not get to read starts the next run, which keeps the working indicator.
-      const unread = this.steering.some((s) => s.session === session);
-      if (!this.handedOver(abort) && !unread) this.post({ type: 'streamEnd' });
-      const ran = Date.now() - this.runStartedAt;
-      if (pausedFor) void this.notifier.notify('paused', 'M.I.T.R.A.M paused', pausedText[pausedFor]);
-      else void this.notifier.notify('done', 'M.I.T.R.A.M finished', session.title, ran);
+      const unread = chat.steering.length > 0;
+      if (!this.handedOver(chat, abort) && !unread) this.postFor(session, { type: 'streamEnd' });
+      const ran = Date.now() - chat.startedAt;
+      chat.ended = pausedFor ? { kind: 'paused', reason: pausedFor, steps: pausedSteps } : { kind: 'done' };
+      if (pausedFor) void this.notifier.notify('paused', 'M.I.T.R.A.M paused', `${session.title}: ${pausedText[pausedFor]}`, 0, this.notifyChat(session));
+      else void this.notifier.notify('done', 'M.I.T.R.A.M finished', session.title, ran, this.notifyChat(session));
     } catch (error) {
       if (abort.signal.aborted) {
         // History is kept consistent by the agent loop, so a cancelled turn is not retried.
         // A newer run keeps the working indicator going, so only a plain stop ends it.
-        if (!this.handedOver(abort)) {
-          this.lastRun = undefined;
-          this.post({ type: 'streamEnd' });
+        if (!this.handedOver(chat, abort)) {
+          chat.lastRun = undefined;
+          this.postFor(session, { type: 'streamEnd' });
         }
       } else {
         // Drop the failed turn from the model's history so Retry starts clean.
         session.history.length = turnStart;
         // Retry asks again everything this turn was asked, including messages sent while it ran.
-        const unread = this.takeSteering(session).map((s) => s.run);
-        if (steered.length || unread.length) this.lastRun = mergeRuns([run, ...steered, ...unread]);
+        const unread = this.takeSteering(chat).map((s) => s.run);
+        if (steered.length || unread.length) chat.lastRun = mergeRuns([run, ...steered, ...unread]);
         const status = (error as { status?: number } | null)?.status;
         this.logger.error(`run failed: status=${status ?? 'n/a'} ${describeError(error)}`);
-        this.post({
-          type: 'error',
-          message: describeError(error),
-          needsSetup: status === 401 || status === 403 || status === 404,
-        });
-        void this.notifier.notify('error', 'M.I.T.R.A.M hit an error', describeError(error));
+        this.failRun(chat, describeError(error), status === 401 || status === 403 || status === 404);
+        void this.notifier.notify('error', 'M.I.T.R.A.M hit an error', `${session.title}: ${describeError(error)}`, 0, this.notifyChat(session));
       }
     } finally {
       this.flushDeltas();
       // Pick up the files this run changed, so the next message's search sees them.
       if (root && settings.retrieveContext) void this.retriever.warm(root);
-      if (this.abort === abort) {
+      if (chat.abort === abort) {
         // Stopped before reading them: they stay in the history, so the next request still sees them.
         // (A newer run that has started reads them itself.)
-        if (abort.signal.aborted) for (const s of this.takeSteering(session)) session.history.push({ role: 'user', content: s.content });
-        this.abort = undefined;
+        if (abort.signal.aborted) for (const s of this.takeSteering(chat)) session.history.push({ role: 'user', content: s.content });
+        chat.abort = undefined;
+        chat.queuedForSlot = false;
+        chat.touched.clear();
         // Only this run's prompts: a newer run that already started may be waiting on its own.
-        this.pendingApprovals.clear();
-        this.pendingTools.clear();
+        chat.pendingApprovals.clear();
+        chat.pendingTools.clear();
+        if (chat.ended && session !== this.session) chat.unread = true;
       }
-      await this.store.save(session);
+      // A deleted chat must not come back because its run saved it.
+      if (!chat.deleted) await this.store.save(session, session === this.session);
       this.postSessions();
       this.postCheckpoint();
+      this.postChatChanges();
+      this.postTasks();
     }
+  }
+
+  /** Records a failed run, so the error shows again when the chat is opened, and shows it if it is open now. */
+  private failRun(chat: ChatRun, message: string, needsSetup: boolean): void {
+    chat.ended = { kind: 'error', message, needsSetup };
+    if (chat.session === this.session) this.post({ type: 'error', message, needsSetup });
+    else chat.unread = true;
+    this.postTasks();
+  }
+
+  /** For a notification about a chat: whether it is on screen, and how to open it. */
+  private notifyChat(session: Session): { onScreen: boolean; open: () => void } {
+    return {
+      onScreen: session === this.session,
+      open: () => {
+        this.focus();
+        if (session !== this.session && !this.runs.get(session.id)?.deleted) void this.switchSession(session.id);
+      },
+    };
   }
 
   private onAgentEvent(session: Session, event: AgentEvent): void {
@@ -1084,7 +1343,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.emit(session, { type: 'streamDelta', text: event.text });
         break;
       case 'thinking':
-        this.emit(session, { type: 'thinkingDelta', text: event.text });
+        this.emit(session, { type: 'thinkingDelta', text: event.text, at: Date.now() });
         break;
       case 'tool_start':
         this.toolNames.set(event.id, event.name);
@@ -1095,6 +1354,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           this.logger.info(`tool ${this.toolNames.get(event.id) ?? '?'}: ${event.status}`);
         }
         this.emit(session, { ...event, type: 'toolUpdate' });
+        break;
+      case 'tool_output':
+        this.emit(session, { ...event, type: 'toolOutput' });
         break;
       case 'notice':
         this.logger.info(`notice: ${event.text}`);
@@ -1114,8 +1376,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           cacheWriteTokens: u.cacheWriteTokens,
           contextWindow: this.contextWindow,
         };
-        this.lastUsage = { sessionId: session.id, message };
-        if (session === this.session) this.post(message);
+        this.chatRun(session).usage = message;
+        this.postFor(session, message);
         break;
       }
     }
@@ -1134,6 +1396,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         this.emit(session, { ...event, type: 'toolUpdate', parentId });
         break;
+      case 'tool_output':
+        this.emit(session, { ...event, type: 'toolOutput', parentId });
+        break;
       case 'notice':
         this.logger.info(`subagent notice: ${event.text}`);
         break;
@@ -1141,7 +1406,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** `parentId` is set when a sub-agent asks: the id of its card, which shows the request. */
-  private askApproval(session: Session, request: ApprovalRequest, signal: AbortSignal, parentId?: string): Promise<ApprovalDecision> {
+  private askApproval(chat: ChatRun, request: ApprovalRequest, signal: AbortSignal, parentId?: string): Promise<ApprovalDecision> {
+    const { session } = chat;
     const name = request.tool.name;
     const { id } = request;
     // The host works out the rule and keeps it here, so the webview can only accept or decline it.
@@ -1150,19 +1416,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (rule) {
       this.emit(session, { type: 'toolAllowRule', id, label: describeRule(rule), usesShell: hasShellSyntax(rule.command), parentId });
     }
-    this.pendingTools.set(id, request);
-    // The agent is blocked until the user answers, so tell them even if they are in another window.
-    void this.notifier.notify('approval', 'M.I.T.R.A.M needs your approval', request.summary);
+    const clash = this.otherChatEditing(chat, request);
+    if (clash) {
+      this.emit(session, {
+        type: 'toolWarning',
+        id,
+        text: `The chat "${clash}" is also working and has changed this file. Allowing this may overwrite its edits, or the other way round.`,
+        parentId,
+      });
+    }
+    chat.pendingTools.set(id, request);
+    // The agent is blocked until the user answers, so tell them even if they are in another window or chat.
+    const body = session === this.session ? request.summary : `${session.title}: ${request.summary}`;
+    void this.notifier.notify('approval', 'M.I.T.R.A.M needs your approval', body, 0, this.notifyChat(session));
+    this.postTasks();
     const settle = () => {
-      this.pendingTools.delete(id);
+      chat.pendingTools.delete(id);
       this.proposals.clear(id);
+      this.postTasks();
     };
     return new Promise<ApprovalDecision>((resolve) => {
-      this.pendingApprovals.set(id, (decision) => {
+      chat.pendingApprovals.set(id, (decision) => {
         if (decision === 'always') {
           // A command is remembered as a rule for this workspace, never as "every command".
           if (rule) void this.allowCommandRule(rule);
-          else if (name !== 'run_command') this.alwaysAllowed.add(name);
+          else if (name !== 'run_command') chat.alwaysAllowed.add(name);
         }
         settle();
         resolve(decision);
@@ -1170,7 +1448,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       signal.addEventListener(
         'abort',
         () => {
-          if (this.pendingApprovals.delete(id)) {
+          if (chat.pendingApprovals.delete(id)) {
             settle();
             resolve('reject');
           }
@@ -1179,6 +1457,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       );
     });
   }
+
+  /** The title of another chat whose run in progress has written the file this edit would change. */
+  private otherChatEditing(chat: ChatRun, request: ApprovalRequest): string | undefined {
+    if (request.tool.name !== 'edit_file' && request.tool.name !== 'create_file') return undefined;
+    const rel = (request.input as { path?: unknown } | null)?.path;
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (typeof rel !== 'string' || !root) return undefined;
+    const abs = path.resolve(root, rel);
+    for (const other of this.runs.values()) {
+      if (other !== chat && other.abort && other.touched.has(abs)) return other.session.title;
+    }
+    return undefined;
+  }
+
 
   private async pickFiles(): Promise<void> {
     const uris = await vscode.window.showOpenDialog({
@@ -1273,7 +1565,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async viewDiff(id: string): Promise<void> {
-    const request = this.pendingTools.get(id);
+    const request = this.runs.get(this.session.id)?.pendingTools.get(id);
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!request?.tool.propose || !root) return;
     try {
@@ -1379,9 +1671,229 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private logChange({ callId, abs, before, after }: FileChange): void {
+  private logChange(session: Session, { callId, abs, before, after }: FileChange): void {
+    this.chatRun(session).touched.add(abs);
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     this.changes.record(callId, { path: root ? path.relative(root, abs) : abs, abs, before, after });
+    void this.chatChanges.record(session, abs, before).then(() => {
+      if (session === this.session) this.postChatChanges();
+    });
+  }
+
+  private changesTimer?: NodeJS.Timeout;
+
+  /**
+   * Sends the chat's changed files to the panel. Working them out reads every file, so a burst of
+   * edits is answered once, a moment after the last one.
+   */
+  private postChatChanges(): void {
+    clearTimeout(this.changesTimer);
+    this.changesTimer = setTimeout(() => void this.sendChatChanges(), CHANGES_DEBOUNCE_MS);
+  }
+
+  private async sendChatChanges(): Promise<void> {
+    const session = this.session;
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const files = await this.chatChanges.summarize(session, createVscodeFilePort());
+    // The user may have switched chats while the files were read.
+    if (session !== this.session) return;
+    this.post({
+      type: 'chatChanges',
+      files: files.map(({ abs, ...rest }) => ({ path: root ? path.relative(root, abs) : abs, ...rest })),
+    });
+  }
+
+  /** The chat's entry for a path the webview sent back. Only files the chat recorded can be named. */
+  private chatEntry(rel: string): string | undefined {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return this.session.changes?.find((c) => (root ? path.relative(root, c.abs) : c.abs) === rel)?.abs;
+  }
+
+  /** Opens one file's diff from before the chat to now. The right side is the live file, so it can be edited there. */
+  private async viewChatChange(rel: string): Promise<void> {
+    const abs = this.chatEntry(rel);
+    if (!abs) return;
+    const original = await this.chatChanges.original(this.session, abs);
+    if (original === undefined) {
+      void vscode.window.showInformationMessage(`M.I.T.R.A.M: ${rel} was too large to keep its earlier version, so there is no diff.`);
+      return;
+    }
+    const key = `chat-${this.session.id}`;
+    const left = this.proposals.set(key, rel, 'original', original ?? '');
+    const exists = fs.existsSync(abs);
+    const right = exists ? vscode.Uri.file(abs) : this.proposals.set(key, rel, 'deleted', '');
+    const what = original === null ? 'created in this chat' : exists ? 'changes in this chat' : 'deleted in this chat';
+    await vscode.commands.executeCommand('vscode.diff', left, right, `${rel} (${what})`);
+  }
+
+  /**
+   * Puts one file, or every file, back as it was before the chat. Files the chat created go to the
+   * trash; other files are rewritten through the editor, so Undo there brings the change back.
+   */
+  private async revertChat(rel?: string): Promise<void> {
+    const session = this.session;
+    if (this.runs.get(session.id)?.abort) {
+      void vscode.window.showInformationMessage('M.I.T.R.A.M: Stop the agent or wait for it to finish before reverting.');
+      return;
+    }
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const targets = rel === undefined ? (session.changes ?? []).map((c) => c.abs) : [this.chatEntry(rel)].filter((a): a is string => !!a);
+    if (targets.length === 0) return;
+    if (rel === undefined) {
+      const answer = await vscode.window.showWarningMessage(
+        `Revert ${targets.length} file${targets.length === 1 ? '' : 's'} to how ${targets.length === 1 ? 'it was' : 'they were'} before this chat?`,
+        { modal: true, detail: 'Edits you made to these files since are reverted too. Files this chat created are moved to the trash.' },
+        'Revert',
+      );
+      if (answer !== 'Revert') return;
+    }
+
+    const port = {
+      ...createVscodeFilePort(),
+      remove: async (abs: string) => {
+        await vscode.workspace.fs.delete(vscode.Uri.file(abs), { useTrash: true });
+      },
+    };
+    const relOf = (abs: string) => (root ? path.relative(root, abs) : abs);
+    const reverted: string[] = [];
+    const skipped: string[] = [];
+    for (const abs of targets) {
+      try {
+        if (await this.chatChanges.revert(session, abs, port)) reverted.push(relOf(abs));
+        else skipped.push(relOf(abs));
+      } catch (error) {
+        this.logger.error(`revert ${relOf(abs)} failed: ${describeError(error)}`);
+        skipped.push(relOf(abs));
+      }
+    }
+
+    const parts: string[] = [];
+    if (reverted.length) parts.push(`Reverted ${reverted.length} file${reverted.length === 1 ? '' : 's'} to before this chat: ${reverted.join(', ')}.`);
+    if (skipped.length) parts.push(`Could not revert ${skipped.join(', ')}.`);
+    this.emit(session, { type: 'notice', text: parts.join(' ') });
+    if (reverted.length) {
+      // Tell the model, so it doesn't build on edits that are gone.
+      session.history.push({
+        role: 'user',
+        content: `[The user reverted these files to how they were before this conversation: ${reverted.join(', ')}. Your earlier changes to them are gone.]`,
+      });
+    }
+    // The last turn's revert point would now try to undo changes that are no longer there.
+    if (rel === undefined) this.checkpoints.delete(session.id);
+    await this.store.save(session);
+    this.postCheckpoint();
+    this.postChatChanges();
+  }
+
+  private postProcesses(): void {
+    const title = (owner: string) => this.store.get(owner)?.title ?? (owner === this.session.id ? this.session.title : 'a deleted chat');
+    const list: ProcessView[] = this.processes.list().map((p) => ({
+      id: p.id,
+      command: p.command,
+      status: p.status,
+      exitCode: p.exitCode,
+      startedAt: p.startedAt,
+      endedAt: p.endedAt,
+      chat: title(p.owner),
+      mine: p.owner === this.session.id,
+    }));
+    this.post({ type: 'processes', list });
+  }
+
+  /** Streams one process's output to the panel: what is kept so far, then what arrives. */
+  private watchProcess(id?: string): void {
+    clearTimeout(this.processTimer);
+    this.processTimer = undefined;
+    this.processText = '';
+    this.watchedProcess = id;
+    const out = id ? this.processes.read(id) : undefined;
+    if (id && out) this.post({ type: 'processOutput', id, text: out.text.slice(-MAX_LIVE_OUTPUT_CHARS), reset: true });
+  }
+
+  /** Output arrives in many small pieces; the panel gets it a few times a second. */
+  private queueProcessOutput(text: string): void {
+    this.processText += text;
+    this.processTimer ??= setTimeout(() => {
+      this.processTimer = undefined;
+      const id = this.watchedProcess;
+      if (id && this.processText) this.post({ type: 'processOutput', id, text: this.processText });
+      this.processText = '';
+    }, PROCESS_FLUSH_MS);
+  }
+
+  private async processAction(id: string, action: ProcessAction): Promise<void> {
+    switch (action) {
+      case 'stop':
+        await this.processes.stop(id);
+        break;
+      case 'restart':
+        await this.processes.restart(id);
+        break;
+      case 'remove':
+        if (this.processes.remove(id)) this.postProcesses();
+        break;
+      case 'terminal':
+        this.openProcessTerminal(id);
+        break;
+    }
+  }
+
+  /**
+   * Shows a process in a VS Code terminal: its output so far, then live. What is typed there goes to
+   * the process (a dev server's "r to restart", say); Ctrl+C stops it. Closing the terminal leaves it running.
+   */
+  private openProcessTerminal(id: string): void {
+    const existing = this.processTerminals.get(id);
+    if (existing) {
+      existing.show();
+      return;
+    }
+    const info = this.processes.get(id);
+    if (!info) return;
+    const write = new vscode.EventEmitter<string>();
+    const crlf = (text: string) => text.replace(/\r?\n/g, '\r\n');
+    let off: (() => void) | undefined;
+    const pty: vscode.Pseudoterminal = {
+      onDidWrite: write.event,
+      open: () => {
+        write.fire(`\x1b[2m$ ${info.command}\x1b[0m\r\n`);
+        write.fire(crlf(this.processes.read(id)?.text ?? ''));
+        off = this.processes.onEvent((event) => {
+          if (event.type === 'output' && event.id === id) write.fire(crlf(event.text));
+          else if (event.type === 'exit' && event.info.id === id) {
+            const how = event.info.status === 'stopped' ? 'stopped' : `exited with code ${event.info.exitCode ?? 'unknown'}`;
+            write.fire(`\r\n\x1b[2m[${how}]\x1b[0m\r\n`);
+          } else if (event.type === 'start' && event.info.id === id) write.fire(`\r\n\x1b[2m[restarted]\x1b[0m\r\n`);
+        });
+      },
+      close: () => {
+        off?.();
+        write.dispose();
+        this.processTerminals.delete(id);
+      },
+      handleInput: (data) => {
+        if (data === '\x03') {
+          void this.processes.stop(id);
+          return;
+        }
+        // The process reads a pipe, not a terminal, so typed text is echoed here and sent a line at a time.
+        write.fire(data === '\r' ? '\r\n' : data);
+        this.processes.write(id, data === '\r' ? '\n' : data);
+      },
+    };
+    const terminal = vscode.window.createTerminal({ name: `${id}: ${info.command}`, pty });
+    this.processTerminals.set(id, terminal);
+    terminal.show();
+  }
+
+  /** Accepts the chat's changes as they are: the list and the last turn's revert point are cleared. */
+  private async keepChatChanges(): Promise<void> {
+    const session = this.session;
+    await this.chatChanges.forget(session);
+    this.checkpoints.delete(session.id);
+    await this.store.save(session);
+    this.postCheckpoint();
+    this.postChatChanges();
   }
 
   /**
@@ -1439,6 +1951,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     if (checkpoint.size === 0) this.checkpoints.delete(session.id);
     await this.store.save(session);
     this.postCheckpoint();
+    this.postChatChanges();
   }
 
   /** Opens a workspace file at a line, for the links in the "related files" card. */

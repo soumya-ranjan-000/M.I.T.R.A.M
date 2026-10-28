@@ -2,7 +2,7 @@
 
 An AI coding agent in your VS Code sidebar. It can read and search your project, edit files, run commands and fix its own mistakes, while you approve every change that matters.
 
-It talks to **Claude on Azure AI Foundry** using your own endpoint and API key. Nothing goes through any other service.
+It talks to **Claude on Azure AI Foundry**, and to GPT and other models on **Azure OpenAI** or any OpenAI-compatible endpoint, using your own endpoints and API keys. Nothing goes through any other service.
 
 ## Getting started
 
@@ -11,6 +11,17 @@ It talks to **Claude on Azure AI Foundry** using your own endpoint and API key. 
 3. Set `mitram.model` to your **deployment name**.
 4. Run **M.I.T.R.A.M: Set API Key** from the Command Palette.
 5. Click the M.I.T.R.A.M icon in the activity bar (or press `Ctrl+Alt+M` / `Cmd+Alt+M`) and ask for something, such as _"add a unit test for the slugify function and run it"_.
+
+### Using a GPT model on Azure OpenAI (or another OpenAI-compatible endpoint)
+
+You can use these as well as Claude, or instead of it.
+
+1. In your user **Settings**, set `mitram.openai.endpoint` to your resource, for example `https://<resource>.openai.azure.com/`. Any OpenAI-compatible base URL works too, such as `https://api.openai.com/v1` or a local `http://localhost:11434/v1`.
+2. Add your deployment names to `mitram.openai.models`, for example `["gpt-5.6-sol"]`.
+3. Run **M.I.T.R.A.M: Set OpenAI API Key**.
+4. Pick the model from the model chip above the message box (or `/model`). A chat can switch between Claude and GPT models at any time.
+
+On Azure, M.I.T.R.A.M calls `…/openai/deployments/<name>/chat/completions` with the `api-version` in `mitram.openai.apiVersion` (default `2024-12-01-preview`); a newer `/openai/v1` base URL works as well. If `mitram.endpoint` is empty, every model goes to the OpenAI endpoint. These models get the same tools, approvals and plan board; PDFs attached to a message cannot be sent to them, and their reasoning is not shown.
 
 ## What it can do
 
@@ -177,6 +188,7 @@ A `command` starts a local server; a `url` connects to a remote one, which must 
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mitram.endpoint`                                                                    | Your Azure AI Foundry endpoint (user settings only)                                                                                                     |
 | `mitram.model` / `mitram.models`                                                     | Default model (deployment name) and extra names for the picker                                                                                          |
+| `mitram.openai.endpoint` / `mitram.openai.models` / `mitram.openai.apiVersion`        | An Azure OpenAI or OpenAI-compatible endpoint (user settings only), the models that go to it, and Azure's `api-version`                                  |
 | `mitram.maxTokens`                                                                   | Maximum tokens per reply                                                                                                                                |
 | `mitram.maxIterations` / `mitram.maxRunMinutes`                                      | Pause a run after this many steps (default 60) or minutes (default 20); a Continue button resumes it                                                    |
 | `mitram.verifyBeforeDone`                                                            | Make the agent check its changes and finish its board before it stops (default on)                                                                      |
@@ -212,7 +224,7 @@ Run **M.I.T.R.A.M: Create Project Instructions (MITRAM.md)** to create a `MITRAM
 ## Troubleshooting
 
 - _"No folder is open"_: use **File → Open Folder**. Without one the agent can only chat.
-- _404 or "Not found"_: check the endpoint URL, and that `mitram.model` is your deployment name.
+- _404 or "Not found"_: check the endpoint URL, and that `mitram.model` is your deployment name. For a GPT model, check that the name in `mitram.openai.models` is the deployment name, not the model family, and that `mitram.openai.apiVersion` is one your resource accepts.
 - _An error mentioning `cache_control`_: set `mitram.promptCaching` to `false`.
 - _The agent says it has no tools_: it is running without a folder, or the model deployment does not support tool use.
 - _The Filesystem MCP server cannot reach my folder (Windows)_: remove it and add it again from the MCP panel. The wizard fills in your project folder in the right form (`C:\Users\you\project`) and checks that it exists. Open **M.I.T.R.A.M: Show Logs** to see why a server failed to start.
@@ -239,7 +251,7 @@ If the development window's extension host crashes on F5 (exit code 134 in VS Co
 
 ## Known limitations
 
-- Claude on Azure AI Foundry only.
+- Claude models need Azure AI Foundry. Models on an OpenAI-compatible endpoint cannot read attached PDFs, and their reasoning is not shown.
 - Commands run in a background process, not in a terminal tab.
 - Summaries are written by the model, so details can be lost; the plan board and your project files are the reliable memory for long work.
 - Not tested on real multi-hour tasks yet. Run `npm run eval` against your deployment to see how it does.
