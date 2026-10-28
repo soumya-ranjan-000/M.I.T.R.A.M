@@ -287,8 +287,9 @@ describe('runAgent', () => {
       [stop('end_turn')],
     ]);
     await runAgent(options);
-    const updates = events.filter((e) => e.type === 'tool_update' && e.id === 't1' && e.output !== undefined);
-    expect(updates[0]).toEqual({ type: 'tool_update', id: 't1', status: 'running', output: 'live\n' });
+    const live = events.filter((e) => e.type === 'tool_output' && e.id === 't1');
+    expect(live[0]).toEqual({ type: 'tool_output', id: 't1', text: 'live\n' });
+    const updates = events.filter((e) => e.type === 'tool_update' && e.id === 't1');
     expect(updates.at(-1)).toMatchObject({ status: 'ok' });
   });
 

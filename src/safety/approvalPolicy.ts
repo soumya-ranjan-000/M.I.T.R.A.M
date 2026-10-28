@@ -35,7 +35,7 @@ export function isAutoApproved(
   }
 
   if (settings.skipApprovalPrompts) {
-    if (toolName === 'edit_file' || toolName === 'create_file') return true;
+    if (toolName === 'edit_file' || toolName === 'create_file' || toolName === 'stop_process') return true;
     if (toolName === 'run_command') {
       return !!String((input as { command?: unknown } | null)?.command ?? '').trim();
     }

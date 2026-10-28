@@ -21,11 +21,16 @@ export class Notifier {
 
   constructor(private readonly deps: NotifierDeps) {}
 
-  async notify(kind: NotifyKind, title: string, body: string, runMs = 0): Promise<void> {
+  /**
+   * `chat` describes the chat this is about: whether it is the one on screen (a visible view showing
+   * another chat does not count as seeing it), and how to open it.
+   */
+  async notify(kind: NotifyKind, title: string, body: string, runMs = 0, chat?: { onScreen: boolean; open: () => void }): Promise<void> {
+    const viewVisible = this.deps.viewVisible() && (chat?.onScreen ?? true);
     const channel = chooseChannel(
       this.deps.mode(),
       kind,
-      { windowFocused: vscode.window.state.focused, viewVisible: this.deps.viewVisible(), remote: !!vscode.env.remoteName },
+      { windowFocused: vscode.window.state.focused, viewVisible, remote: !!vscode.env.remoteName },
       runMs,
     );
     if (channel === 'none') return;
@@ -42,13 +47,13 @@ export class Notifier {
         `notifications: no desktop notification could be raised on ${process.platform}${process.platform === 'linux' ? ' (is notify-send installed?)' : ''}; using VS Code messages instead`,
       );
     }
-    this.showInApp(kind, title, body);
+    this.showInApp(kind, title, body, chat?.open ?? this.deps.openChat);
   }
 
-  private showInApp(kind: NotifyKind, title: string, body: string): void {
+  private showInApp(kind: NotifyKind, title: string, body: string, open: () => void): void {
     const show = kind === 'error' || kind === 'approval' ? vscode.window.showWarningMessage : vscode.window.showInformationMessage;
     void Promise.resolve(show(body ? `${title}: ${body}` : title, 'Open chat')).then((choice) => {
-      if (choice === 'Open chat') this.deps.openChat();
+      if (choice === 'Open chat') open();
     });
   }
 }

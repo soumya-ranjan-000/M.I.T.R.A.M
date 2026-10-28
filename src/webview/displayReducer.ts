@@ -1,5 +1,16 @@
 import type { DisplayMessage, HostToWebview, ToolCall } from './protocol';
 
+/** Output kept on a running command's card. Older lines are dropped first; the finished card gets the tool's result instead. */
+export const MAX_LIVE_OUTPUT_CHARS = 200_000;
+
+/** The end of `text`, cut at a line break so the first line shown is whole. */
+function keepTail(text: string): string {
+  if (text.length <= MAX_LIVE_OUTPUT_CHARS) return text;
+  const tail = text.slice(-MAX_LIVE_OUTPUT_CHARS);
+  const nl = tail.indexOf('\n');
+  return nl >= 0 ? tail.slice(nl + 1) : tail;
+}
+
 type ToolMessage = Extract<DisplayMessage, { role: 'tool' }>;
 
 /** Changes the top-level tool card with this id. */
@@ -34,9 +45,9 @@ export function applyHostEvent(messages: DisplayMessage[], event: HostToWebview)
     case 'thinkingDelta': {
       const last = messages[messages.length - 1];
       if (last?.role === 'thinking') {
-        return [...messages.slice(0, -1), { ...last, text: last.text + event.text }];
+        return [...messages.slice(0, -1), { ...last, text: last.text + event.text, ...(event.at ? { endedAt: event.at } : {}) }];
       }
-      return [...messages, { role: 'thinking', text: event.text }];
+      return [...messages, { role: 'thinking', text: event.text, ...(event.at ? { startedAt: event.at, endedAt: event.at } : {}) }];
     }
     case 'toolStart': {
       const call: ToolCall = { id: event.id, name: event.name, summary: event.summary, detail: event.detail, status: event.status };
@@ -45,6 +56,10 @@ export function applyHostEvent(messages: DisplayMessage[], event: HostToWebview)
     }
     case 'toolUpdate':
       return updateCall(messages, event.id, event.parentId, (c) => ({ ...c, status: event.status, output: event.output ?? c.output }));
+    case 'toolOutput':
+      return updateCall(messages, event.id, event.parentId, (c) => ({ ...c, output: keepTail((c.output ?? '') + event.text) }));
+    case 'toolWarning':
+      return updateCall(messages, event.id, event.parentId, (c) => ({ ...c, warning: event.text }));
     case 'toolAllowRule':
       return updateCall(messages, event.id, event.parentId, (c) => ({ ...c, allowRule: { label: event.label, usesShell: event.usesShell } }));
     case 'toolNote':

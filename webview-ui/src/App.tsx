@@ -1,21 +1,26 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { describeActivity } from '../../src/webview/activity';
-import { applyHostEvent } from '../../src/webview/displayReducer';
+import { MAX_LIVE_OUTPUT_CHARS, applyHostEvent } from '../../src/webview/displayReducer';
 import {
   SUBAGENT_TOOL,
   type Board,
+  type ChangedFileView,
   type DisplayMessage,
   type HostToWebview,
   type FileAttachment,
   type ImageAttachment,
   type McpPresetView,
   type McpServerView,
+  type ProcessView,
   type SessionSummary,
+  type TaskView,
 } from '../../src/webview/protocol';
+import { groupSteps, type Indexed } from '../../src/webview/steps';
 import { emptyBoard } from '../../src/agent/board';
 import type { SlashCommand } from '../../src/webview/slashCommands';
 import { Avatar, MessageHeader } from './components/Avatar';
 import { BoardPanel } from './components/BoardPanel';
+import { ChangedFilesPanel } from './components/ChangedFilesPanel';
 import { FileStrip, ImageStrip } from './components/Attachments';
 import { AgentState, Composer } from './components/Composer';
 import { Header } from './components/Header';
@@ -23,10 +28,13 @@ import { Icon } from './components/Icon';
 import { Markdown } from './components/Markdown';
 import { McpPanel } from './components/McpPanel';
 import { PinnedRequest } from './components/PinnedRequest';
+import { ProcessPanel } from './components/ProcessPanel';
 import { RetrievedCard } from './components/RetrievedCard';
+import { StepGroup } from './components/StepGroup';
+import { TaskList } from './components/TaskList';
 import { SubagentCard } from './components/SubagentCard';
 import { ThinkingBlock } from './components/ThinkingBlock';
-import { ToolCard } from './components/ToolCard';
+import { OPEN_PROCESS_EVENT, ToolCard } from './components/ToolCard';
 import { Usage } from './components/UsageBar';
 import { WorkingStatus } from './components/WorkingStatus';
 import { onHostMessage, postToHost } from './vscode';
@@ -53,6 +61,8 @@ interface McpState {
   problems: string[];
 }
 
+const messageKey = ({ message, index }: Indexed) => (message.role === 'tool' ? message.id : String(index));
+
 const speaker = (m: DisplayMessage): 'user' | 'assistant' => (m.role === 'user' ? 'user' : 'assistant');
 
 export function App() {
@@ -66,6 +76,7 @@ export function App() {
   const [hasSelection, setHasSelection] = useState(false);
   const [hasWorkspace, setHasWorkspace] = useState(true);
   const [changedFiles, setChangedFiles] = useState<string[]>([]);
+  const [chatChanges, setChatChanges] = useState<ChangedFileView[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [planMode, setPlanMode] = useState(false);
   const [planReady, setPlanReady] = useState(false);
@@ -75,6 +86,13 @@ export function App() {
   const [mcp, setMcp] = useState<McpState | null>(null);
   const [mcpOpen, setMcpOpen] = useState(false);
   const [statusNote, setStatusNote] = useState('');
+  const [collapseSteps, setCollapseSteps] = useState(true);
+  /** Other chats working, or finished, out of sight. */
+  const [tasks, setTasks] = useState<TaskView[]>([]);
+  const [processes, setProcesses] = useState<ProcessView[]>([]);
+  /** The background process shown in the terminals panel, or null while it is closed. */
+  const [shownProcess, setShownProcess] = useState<string | null>(null);
+  const [processLog, setProcessLog] = useState({ id: '', text: '' });
   /** Messages sent mid-run that the agent has not read yet. */
   const [steering, setSteering] = useState(0);
   const busyRef = useRef(false);
@@ -148,6 +166,25 @@ export function App() {
         case 'modelInfo':
           setModel(msg.model);
           break;
+        case 'displaySettings':
+          setCollapseSteps(msg.collapseToolCalls);
+          break;
+        case 'tasks':
+          setTasks(msg.tasks);
+          break;
+        case 'processes':
+          setProcesses(msg.list);
+          break;
+        case 'processOutput': {
+          const { id, text, reset } = msg;
+          setProcessLog((prev) =>
+            reset || prev.id !== id ? { id, text } : { id, text: (prev.text + text).slice(-MAX_LIVE_OUTPUT_CHARS) },
+          );
+          break;
+        }
+        case 'planReady':
+          setPlanReady(true);
+          break;
         case 'error':
           flush();
           setStatusNote('');
@@ -162,6 +199,7 @@ export function App() {
           if (frame) cancelAnimationFrame(frame);
           frame = 0;
           setMessages(msg.messages);
+          setStatusNote('');
           setUsage(null);
           setPlanReady(false);
           setBudget(null);
@@ -175,6 +213,9 @@ export function App() {
           break;
         case 'checkpoint':
           setChangedFiles(msg.files);
+          break;
+        case 'chatChanges':
+          setChatChanges(msg.files);
           break;
         case 'sessions':
           setSessions(msg.list);
@@ -195,6 +236,13 @@ export function App() {
       off();
       if (frame) cancelAnimationFrame(frame);
     };
+  }, []);
+
+  // A background command's card opens the terminals panel on its process.
+  useEffect(() => {
+    const open = (e: Event) => setShownProcess((e as CustomEvent<string>).detail);
+    window.addEventListener(OPEN_PROCESS_EVENT, open);
+    return () => window.removeEventListener(OPEN_PROCESS_EVENT, open);
   }, []);
 
   // Escape stops a running turn (unless a menu in the composer already used it).
@@ -344,12 +392,43 @@ export function App() {
   const agentState: AgentState = !busy ? 'idle' : describeActivity(messages).waitingForUser ? 'waiting' : 'working';
   const visible = messages.filter((m) => !(m.role === 'tool' && m.name === 'update_board'));
   const pinnedMessage = pinned === null ? undefined : visible[pinned];
+  const items = collapseSteps ? groupSteps(visible) : groupSteps(visible, Infinity);
+  const last = messages[messages.length - 1];
+
+  function renderMessage({ message: m, index: i }: Indexed) {
+    return (
+      <Fragment key={messageKey({ message: m, index: i })}>
+        {m.role === 'user' && (
+          <div
+            className="bubble"
+            ref={(node) => {
+              if (node && !FOLLOW_UPS.has(m.text)) requests.current.set(i, node);
+              else requests.current.delete(i);
+            }}
+          >
+            {m.images?.length ? <ImageStrip images={m.images} /> : null}
+            {m.files?.length ? <FileStrip files={m.files} /> : null}
+            {m.text}
+          </div>
+        )}
+        {m.role === 'assistant' && (
+          <div className="reply">
+            <Markdown text={m.text} />
+          </div>
+        )}
+        {m.role === 'thinking' && <ThinkingBlock text={m.text} live={busy && m === last} startedAt={m.startedAt} endedAt={m.endedAt} />}
+        {m.role === 'tool' && (m.name === SUBAGENT_TOOL ? <SubagentCard tool={m} /> : <ToolCard tool={m} />)}
+        {m.role === 'retrieved' && <RetrievedCard files={m.files} />}
+      </Fragment>
+    );
+  }
 
   return (
     <div className="app">
       <Header
         sessions={sessions}
         activeId={activeId}
+        tasks={tasks}
         onOpenMcp={openMcp}
         mcpConnected={mcp?.servers.filter((s) => s.status === 'ready').length ?? 0}
       />
@@ -394,33 +473,19 @@ export function App() {
               </ul>
             </div>
           )}
+          {messages.length === 0 && !error && <TaskList tasks={tasks} />}
 
-          {visible.map((m, i) => {
-            const header = i === 0 || speaker(visible[i - 1]) !== speaker(m);
+          {items.map((item, n) => {
+            const first = item.kind === 'steps' ? item.steps[0] : item;
+            const header = first.index === 0 || speaker(visible[first.index - 1]) !== speaker(first.message);
             return (
-              <Fragment key={m.role === 'tool' ? m.id : i}>
-                {header && <MessageHeader role={speaker(m)} />}
-                {m.role === 'user' && (
-                  <div
-                    className="bubble"
-                    ref={(node) => {
-                      if (node && !FOLLOW_UPS.has(m.text)) requests.current.set(i, node);
-                      else requests.current.delete(i);
-                    }}
-                  >
-                    {m.images?.length ? <ImageStrip images={m.images} /> : null}
-                  {m.files?.length ? <FileStrip files={m.files} /> : null}
-                    {m.text}
-                  </div>
+              <Fragment key={item.kind === 'steps' ? `steps-${first.index}` : messageKey(first)}>
+                {header && <MessageHeader role={speaker(first.message)} />}
+                {item.kind === 'steps' ? (
+                  <StepGroup steps={item.steps} active={busy && n === items.length - 1} renderStep={renderMessage} />
+                ) : (
+                  renderMessage(item)
                 )}
-                {m.role === 'assistant' && (
-                  <div className="reply">
-                    <Markdown text={m.text} />
-                  </div>
-                )}
-                {m.role === 'thinking' && <ThinkingBlock text={m.text} live={busy && m === messages[messages.length - 1]} />}
-                {m.role === 'tool' && (m.name === SUBAGENT_TOOL ? <SubagentCard tool={m} /> : <ToolCard tool={m} />)}
-                {m.role === 'retrieved' && <RetrievedCard files={m.files} />}
               </Fragment>
             );
           })}
@@ -476,16 +541,21 @@ export function App() {
         />
       )}
       <BoardPanel board={board} busy={busy} />
-      {changedFiles.length > 0 && !busy && (
-        <div className="notice-bar">
-          <span title={changedFiles.join('\n')}>
-            {changedFiles.length} file{changedFiles.length === 1 ? '' : 's'} changed in the last turn
-          </span>
-          <button onClick={() => postToHost({ type: 'revert' })} title="Restore the files the agent changed">
-            <Icon name="undo" /> Revert changes
-          </button>
-        </div>
-      )}
+      <ProcessPanel
+        processes={processes}
+        selected={shownProcess}
+        onSelect={setShownProcess}
+        log={processLog.id === shownProcess ? processLog.text : ''}
+        onAsk={(p) =>
+          send(
+            `Read the output of background process ${p.id} (\`${p.command}\`) with read_process_output and tell me whether anything is wrong.`,
+            false,
+            [],
+            planMode,
+          )
+        }
+      />
+      <ChangedFilesPanel files={chatChanges} turnFiles={changedFiles} busy={busy} />
       {planReady && !busy && (
         <div className="notice-bar plan" role="region" aria-label="Plan ready">
           <span>Plan ready. Review it above, then run it or keep refining.</span>

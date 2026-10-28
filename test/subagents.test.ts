@@ -43,6 +43,19 @@ describe('Slots', () => {
     expect(slots.free).toBe(true);
   });
 
+  it('reads a size given as a function on every check, so a new setting applies to the next waiter', async () => {
+    let size = 1;
+    const slots = new Slots(() => size);
+    let release = () => {};
+    const held = slots.use(ctx().signal, () => new Promise<void>((r) => (release = r)));
+    await tick();
+    expect(slots.free).toBe(false);
+    size = 2;
+    expect(slots.free).toBe(true);
+    release();
+    await held;
+  });
+
   it('runs work and returns its value', async () => {
     expect(await new Slots(2).use(ctx().signal, async () => 42)).toBe(42);
   });

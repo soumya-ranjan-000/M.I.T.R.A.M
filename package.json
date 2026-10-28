@@ -199,6 +199,11 @@
           "default": true,
           "description": "Show the model's reasoning summary while it works. If your deployment doesn't support it, M.I.T.R.A.M falls back automatically."
         },
+        "mitram.collapseToolCalls": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fold the agent's tool calls and reasoning between two replies into one line, such as \"Read 3 files, ran 2 commands\". It shows what is running while the agent works and folds away when it is done. Approval prompts always stay visible. Click the line to see every step."
+        },
         "mitram.maxRunMinutes": {
           "type": "number",
           "default": 20,
@@ -218,6 +223,13 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Let the agent hand self-contained tasks to sub-agents that work in parallel, each with its own context, and report back. Sub-agents follow the same approval settings and safety rules, and in plan mode they can only read."
+        },
+        "mitram.maxConcurrentRuns": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 8,
+          "markdownDescription": "How many chats may have the agent working at the same time. A chat keeps working when you start a new one or switch to another; past this number, a chat waits for another to finish. Each one makes its own model requests and shares your deployment's rate limit."
         },
         "mitram.maxParallelSubagents": {
           "type": "number",

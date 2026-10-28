@@ -41,7 +41,7 @@ kbd {
 .history-menu li button:hover, .history-menu li button:focus-visible { background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground)); color: var(--vscode-menu-selectionForeground, inherit); }
 .history-menu li button.active { font-weight: 600; }
 .history-empty { padding: 6px 8px; opacity: 0.6; }
-.history-item-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.history-item-title { flex: 1; min-width: 0; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .history-item-time { opacity: 0.6; font-size: 0.85em; flex-shrink: 0; }
 .banner {
   padding: 8px var(--pad); font-size: 0.9em; border-bottom: 1px solid var(--vscode-panel-border);
@@ -347,8 +347,13 @@ code.inline { font-family: var(--vscode-editor-font-family); background: var(--v
   margin: 4px 0 0; padding: 6px 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
   font-family: var(--vscode-editor-font-family); font-size: 0.9em; background: var(--vscode-textCodeBlock-background); border-radius: 4px;
 }
-/* A running command's latest lines: a fixed window, so the transcript doesn't jump as output arrives. */
-.toolcard-body.live { overflow: hidden; opacity: 0.85; }
+/* A running command's log: grows to a window that follows the newest line, so the transcript stops moving. */
+.toolcard-body.live { max-height: min(240px, 40vh); }
+.toolcard-exit {
+  flex-shrink: 0; padding: 0 5px; border-radius: 6px; font-size: 0.8em; font-family: var(--vscode-editor-font-family);
+  color: var(--vscode-descriptionForeground); border: 1px solid var(--vscode-panel-border);
+}
+.toolcard-exit.failed { color: var(--vscode-errorForeground); border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground)); }
 .spinner {
   flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%;
   border: 2px solid var(--vscode-descriptionForeground); border-top-color: transparent; animation: spin 0.8s linear infinite;
@@ -461,3 +466,122 @@ code.inline { font-family: var(--vscode-editor-font-family); background: var(--v
 .listening-hint { opacity: 1 !important; color: var(--vscode-errorForeground); }
 @keyframes mic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .tool-btn.mic.listening { animation: none; } }
+
+/* ---------- Steps between replies ---------- */
+.step-group { display: flex; flex-direction: column; gap: 6px; }
+.step-group-head {
+  width: 100%; justify-content: flex-start; gap: 6px; padding: 2px 4px 2px 0; text-align: left;
+  background: transparent; color: var(--vscode-descriptionForeground); font-size: 0.92em;
+}
+.step-group-head:hover:not(:disabled) { background: transparent; color: var(--vscode-foreground); }
+.step-group-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.step-group-count { flex-shrink: 0; font-size: 0.9em; opacity: 0.8; }
+.step-group-head .status { display: inline-flex; flex-shrink: 0; }
+.step-group-head .status.error { color: var(--vscode-errorForeground); }
+.step-list { display: flex; flex-direction: column; gap: 6px; padding-left: 10px; border-left: 2px solid var(--vscode-panel-border); }
+.step-group.active .step-list { border-left-color: var(--vscode-focusBorder); }
+
+/* ---------- Secondary content ----------
+   Tool calls, reasoning and logs are quieter than the conversation. Anything that needs the
+   user (an approval, a failure) stays at full strength, as does whatever is hovered or focused. */
+.toolcard, .thinking, .step-group-head { opacity: 0.7; transition: opacity 0.15s; }
+.toolcard .toolcard, .toolcard.pending, .toolcard.waiting, .toolcard.error,
+.toolcard:hover, .toolcard:focus-within, .thinking:hover, .thinking:focus-within, .step-group-head:hover, .step-group-head:focus-visible { opacity: 1; }
+body.vscode-high-contrast .toolcard, body.vscode-high-contrast .thinking, body.vscode-high-contrast .step-group-head,
+body.vscode-high-contrast-light .toolcard, body.vscode-high-contrast-light .thinking, body.vscode-high-contrast-light .step-group-head { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toolcard, .thinking, .step-group-head { transition: none; } }
+
+/* ---------- Image preview on hover ---------- */
+.bubble-thumb, .attachment-thumb { cursor: zoom-in; }
+.image-preview {
+  position: fixed; z-index: 100; pointer-events: none; padding: 4px; border-radius: 8px;
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-panel-border)); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.image-preview img { display: block; border-radius: 4px; object-fit: contain; }
+.image-preview-caption {
+  height: 18px; margin-top: 4px; font-size: 0.85em; line-height: 18px; color: var(--vscode-descriptionForeground);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+
+/* ---------- Files changed in this chat ---------- */
+.changes {
+  margin: 0 var(--pad) 8px; border-radius: 8px; overflow: hidden; font-size: 0.92em;
+  background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-panel-border);
+}
+.changes-head { display: flex; align-items: center; flex-wrap: wrap; }
+.changes-toggle { flex: 1 0 auto; max-width: 100%; justify-content: flex-start; gap: 8px; padding: 7px 10px; background: transparent; color: var(--vscode-foreground); border-radius: 0; }
+.changes-toggle:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
+.changes-title { font-weight: 600; white-space: nowrap; }
+.changes-actions { display: flex; gap: 4px; margin-left: auto; padding: 0 6px 4px; }
+.changes-actions button { padding: 2px 8px; gap: 4px; font-size: 0.92em; background: transparent; color: var(--vscode-foreground); }
+.changes-actions button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
+.changes-counts { display: inline-flex; gap: 6px; flex-shrink: 0; font-family: var(--vscode-editor-font-family); font-size: 0.92em; font-variant-numeric: tabular-nums; }
+.changes-counts .added { color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b); }
+.changes-counts .removed { color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39); }
+.changes-list { list-style: none; margin: 0; padding: 0 4px 4px; max-height: 168px; overflow-y: auto; }
+.changes-list li { display: flex; align-items: center; gap: 2px; border-radius: 4px; }
+.changes-list li:hover, .changes-list li:focus-within { background: var(--vscode-list-hoverBackground); }
+.changes-list li > .icon-btn { opacity: 0; }
+.changes-list li:hover > .icon-btn, .changes-list li:focus-within > .icon-btn { opacity: 1; }
+.changes-file { flex: 1; min-width: 0; justify-content: flex-start; gap: 6px; padding: 3px 6px; background: transparent; color: var(--vscode-foreground); text-align: left; }
+.changes-file:hover:not(:disabled) { background: transparent; }
+.changes-kind { flex-shrink: 0; width: 12px; font-family: var(--vscode-editor-font-family); font-weight: 700; font-size: 0.9em; text-align: center; }
+.changes-list .created .changes-kind { color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b); }
+.changes-list .modified .changes-kind { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); }
+.changes-list .deleted .changes-kind { color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39); }
+.changes-list .deleted .changes-name { text-decoration: line-through; }
+.changes-name { flex-shrink: 0; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.changes-dir { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--vscode-descriptionForeground); font-size: 0.92em; }
+.changes-list .changes-spacer { visibility: hidden; }
+.changes-note { margin: 0; padding: 0 10px 6px; font-size: 0.82em; color: var(--vscode-descriptionForeground); }
+
+/* ---------- Other chats at work ---------- */
+.bg-tasks { width: 100%; max-width: 420px; margin: 0 auto; }
+.bg-tasks-title { margin: 0 0 6px 2px; font-size: 0.8em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--vscode-descriptionForeground); }
+.bg-tasks ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bg-task {
+  width: 100%; justify-content: flex-start; gap: 10px; padding: 8px 10px; text-align: left; border-radius: 8px;
+  background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); border: 1px solid var(--vscode-panel-border);
+}
+.bg-task:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
+.bg-task.waiting { border-color: var(--vscode-editorWarning-foreground, #cca700); }
+.bg-task.error { border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground)); }
+.bg-task-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bg-task-title, .bg-task-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bg-task-label { font-size: 0.88em; color: var(--vscode-descriptionForeground); }
+.bg-task-time { flex-shrink: 0; font-size: 0.85em; font-variant-numeric: tabular-nums; color: var(--vscode-descriptionForeground); }
+.bg-task-status { display: inline-flex; flex-shrink: 0; color: var(--vscode-descriptionForeground); }
+.bg-task-status.done { color: var(--vscode-testing-iconPassed, #73c991); }
+.bg-task-status.waiting, .bg-task-status.paused { color: var(--vscode-editorWarning-foreground, #cca700); }
+.bg-task-status.error { color: var(--vscode-errorForeground); }
+.history-menu .spinner, .history-menu .bg-task-status { margin-right: 2px; }
+.icon-badge.warn { background: var(--vscode-editorWarning-foreground, #cca700); color: #1f1f1f; }
+
+/* ---------- Background processes ---------- */
+.procs { margin: 0 var(--pad) 8px; }
+.procs-chip {
+  gap: 6px; padding: 3px 10px; border-radius: 12px; font-size: 0.88em;
+  background: var(--vscode-editorWidget-background); color: var(--vscode-foreground); border: 1px solid var(--vscode-panel-border);
+}
+.procs-chip:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
+.procs-chip.live > svg:first-child { color: var(--vscode-testing-iconPassed, #73c991); }
+.procs-panel {
+  margin-top: 6px; border-radius: 8px; overflow: hidden;
+  background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-panel-border);
+}
+.procs-list { list-style: none; margin: 0; padding: 4px; max-height: 120px; overflow-y: auto; border-bottom: 1px solid var(--vscode-panel-border); }
+.procs-item { width: 100%; justify-content: flex-start; gap: 8px; padding: 4px 6px; text-align: left; background: transparent; color: var(--vscode-foreground); border-radius: 4px; }
+.procs-item:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
+.procs-item.selected { background: var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground)); color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground)); }
+.procs-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.procs-command { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--vscode-editor-font-family); font-size: 0.92em; }
+.procs-meta { font-size: 0.82em; color: var(--vscode-descriptionForeground); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.procs-item.selected .procs-meta { color: inherit; opacity: 0.8; }
+.procs-dot { flex-shrink: 0; width: 8px; height: 8px; margin: 0 2px; border-radius: 50%; background: var(--vscode-descriptionForeground); }
+.procs-dot.failed { background: var(--vscode-errorForeground); }
+.procs-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; }
+.procs-actions button { padding: 2px 8px; gap: 4px; font-size: 0.88em; background: transparent; color: var(--vscode-foreground); border: 1px solid var(--vscode-panel-border); }
+.procs-actions button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
+.procs-panel .toolcard-body.live { margin: 0 6px 6px; max-height: min(220px, 30vh); min-height: 60px; opacity: 1; }
+.procs-empty { margin: 0 10px 8px; font-size: 0.88em; color: var(--vscode-descriptionForeground); }

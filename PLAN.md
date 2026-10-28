@@ -176,6 +176,38 @@ long investigation does not fill the main conversation. Only the final report co
 **Done:** sub-agents run in parallel behind the same approval gates as the main agent, cannot
 recurse or touch the board, and are told to be verified rather than trusted.
 
+## Phase 9: Chat experience
+
+Make the conversation the main thing on screen, let work carry on in the background, and show
+everything the agent changed in one place. Phases run in order; items inside a phase are independent.
+
+**Phase 9A: transcript (webview only)**
+
+- [x] **9.1** Quieter secondary content: tool cards, reasoning and step lines at 0.7 opacity; approvals, failures, hover and focus at full strength; off in high-contrast themes.
+- [x] **9.2** Reasoning: follows the newest text while streaming, folds when done, and says "Thought for 12s" (timed by the host as pieces arrive).
+- [x] **9.3** Live command logs: output streams to the card as deltas (`toolOutput`, up to 200k characters kept) in a scrolling window that follows the newest line; the card folds when the command finishes, shows `exit N`, and keeps the last lines of a failed run in view.
+- [x] **9.4** Image preview on hover or focus for attached images, in sent messages and in the composer.
+- [x] **9.5** Step groups: tool calls, reasoning and attached files between two replies fold into one line ("Read 3 files, ran 2 commands"). While the agent works the group shows what is running; when done it folds. Approval prompts always show. Setting `mitram.collapseToolCalls`.
+
+**Phase 9B: changed files**
+
+- [x] **9.6** `ChatChanges` per chat: the content before the agent first touched each file in this chat, fed from the same file port as the checkpoint (sub-agents included); paths and kinds in the session, original contents under `globalStorageUri/changes/<sessionId>/`, capped.
+- [x] **9.7** Changed-files panel above the composer, for the whole chat: created / modified / deleted, +/− lines, open, diff (original → now), revert per file, Revert all, Keep. Visible during a run. Notes that files changed by shell commands aren't tracked. Replaces the old "N files changed in the last turn" bar; its revert stays as **Undo last turn**.
+
+**Phase 9C: background runs**
+
+- [x] **9.8** `RunManager`: per-chat run state (abort, queue, steering, approvals, timing, usage, last error). New chat and switching chats no longer stop a run; Stop applies to the chat on screen; deleting a chat stops its run. `mitram.maxConcurrentRuns` (3). A chat is saved when its first message is sent, so it is in the history list while it works; a background save no longer makes that chat the active one.
+- [x] **9.9** Same-file warning: an approval prompt says when another live run has already changed that file.
+- [x] **9.10** Task list: running, waiting, paused, failed and unread-finished chats on the home screen, a running count on the history button, and running chats at the top of the history menu. Notify when a background chat needs approval.
+
+**Phase 9D: background terminals**
+
+- [x] **9.11** `ProcessManager`: long-lived processes per chat with an output ring buffer; killed when their chat is deleted and on `deactivate()`.
+- [x] **9.12** Tools: `run_command` `background: true`, `read_process_output`, `stop_process`, `list_processes`, behind the same command policy and approvals.
+- [x] **9.13** UI: a "N running" chip above the composer opening a log drawer with Stop, Restart, Copy, Open in terminal (a pseudoterminal mirror) and Ask the agent about it.
+
+**Done when:** a chat's work reads as replies with one line per batch of steps, a task keeps running while you start another, and every file a chat changed can be reviewed and reverted from one list.
+
 ## Post-MVP backlog (don't touch before Phase 5 is done)
 
 - More providers (OpenAI-compatible, Ollama), via `ModelProvider`

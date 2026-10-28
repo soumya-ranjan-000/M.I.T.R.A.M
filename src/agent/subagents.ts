@@ -36,14 +36,19 @@ export class Slots {
   private active = 0;
   private readonly waiting = new Set<() => void>();
 
-  constructor(private readonly size: number) {}
+  /** A function is read on every check, so a changed setting applies to the next waiter. */
+  constructor(private readonly size: number | (() => number)) {}
+
+  private get limit(): number {
+    return typeof this.size === 'function' ? this.size() : this.size;
+  }
 
   get free(): boolean {
-    return this.active < this.size;
+    return this.active < this.limit;
   }
 
   async use<T>(signal: AbortSignal, fn: () => Promise<T>): Promise<T> {
-    while (this.active >= this.size) {
+    while (this.active >= this.limit) {
       if (signal.aborted) throw abortError();
       await new Promise<void>((resolve, reject) => {
         const wake = () => {

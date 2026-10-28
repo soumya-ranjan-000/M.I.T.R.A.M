@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { FileAttachment, ImageAttachment } from '../../../src/webview/protocol';
 import { Icon } from './Icon';
 
@@ -5,11 +7,80 @@ const src = (image: ImageAttachment) => `data:${image.mediaType};base64,${image.
 const size = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
 const describe = (image: ImageAttachment) => `${image.name} · ${image.width}×${image.height} · ${size(image.bytes)}`;
 
+/** Largest side of the hover preview, in CSS pixels. */
+const PREVIEW_MAX = 320;
+const GAP = 8;
+/** Room for the caption under the image. */
+const CAPTION = 22;
+
+interface Placement {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Fits the image inside the window next to the thumbnail: above it if there is room, otherwise below. */
+function place(image: ImageAttachment, anchor: DOMRect): Placement {
+  const maxW = Math.min(PREVIEW_MAX, window.innerWidth - 2 * GAP);
+  const maxH = Math.min(PREVIEW_MAX, Math.max(anchor.top, window.innerHeight - anchor.bottom) - 2 * GAP - CAPTION);
+  const scale = Math.min(1, maxW / Math.max(1, image.width), Math.max(40, maxH) / Math.max(1, image.height));
+  const width = Math.round(image.width * scale);
+  const height = Math.round(image.height * scale);
+  const above = anchor.top - GAP - height - CAPTION >= GAP;
+  const top = above ? anchor.top - GAP - height - CAPTION : anchor.bottom + GAP;
+  const left = Math.min(Math.max(GAP, anchor.left), window.innerWidth - GAP - width);
+  return { left, top, width, height };
+}
+
+/** An image thumbnail that shows the image larger while it is hovered or focused. */
+function PreviewThumb({ image, className }: { image: ImageAttachment; className: string }) {
+  const [at, setAt] = useState<Placement | null>(null);
+  const show = (e: React.SyntheticEvent<HTMLImageElement>) => setAt(place(image, e.currentTarget.getBoundingClientRect()));
+  const hide = () => setAt(null);
+  // The preview is pinned to the window, so it would drift away from a thumbnail that scrolls.
+  useEffect(() => {
+    if (!at) return;
+    window.addEventListener('scroll', hide, true);
+    return () => window.removeEventListener('scroll', hide, true);
+  }, [at]);
+  return (
+    <>
+      <img
+        className={className}
+        src={src(image)}
+        alt={image.name}
+        tabIndex={0}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && at) {
+            e.preventDefault();
+            hide();
+          }
+        }}
+      />
+      {at &&
+        createPortal(
+          <div className="image-preview" style={{ left: at.left, top: at.top }} role="tooltip">
+            <img src={src(image)} alt="" width={at.width} height={at.height} />
+            <div className="image-preview-caption" style={{ maxWidth: Math.max(at.width, 120) }}>
+              {describe(image)}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 /** An image waiting to be sent, in the composer. */
 export function ImageChip({ image, onRemove }: { image: ImageAttachment; onRemove: () => void }) {
   return (
-    <span className="image-chip" title={describe(image)}>
-      <img className="attachment-thumb" src={src(image)} alt="" />
+    <span className="image-chip">
+      <PreviewThumb image={image} className="attachment-thumb" />
       <span className="image-chip-text">
         <span className="image-chip-name">{image.name}</span>
         <span className="image-chip-meta">
@@ -63,7 +134,7 @@ export function ImageStrip({ images }: { images: ImageAttachment[] }) {
     <span className="bubble-images">
       {images.map((image) =>
         image.data ? (
-          <img key={image.id} className="bubble-thumb" src={src(image)} alt={image.name} title={describe(image)} />
+          <PreviewThumb key={image.id} image={image} className="bubble-thumb" />
         ) : (
           <span key={image.id} className="image-gone" title={`${image.name} was not kept when the chat was saved.`}>
             <Icon name="image" size={12} /> image (not kept)

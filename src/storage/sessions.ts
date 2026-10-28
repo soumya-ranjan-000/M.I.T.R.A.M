@@ -5,6 +5,7 @@ import type { ChatMessage } from '../providers/ModelProvider';
 import type { Board, DisplayMessage } from '../webview/protocol';
 import { emptyBoard } from '../agent/board';
 import { dropAttachments, hasAttachments } from '../agent/attachments';
+import type { ChatChangeEntry } from '../safety/chatChanges';
 
 export interface Session {
   id: string;
@@ -16,6 +17,8 @@ export interface Session {
   display: DisplayMessage[];
   /** The agent's plan for this chat. Older saved chats don't have one. */
   board?: Board;
+  /** Files the agent changed in this chat. Their earlier content is kept by ChatChangeStore. */
+  changes?: ChatChangeEntry[];
 }
 
 interface Persisted {
@@ -99,13 +102,14 @@ export class SessionStore {
     return this.data.sessions.find((s) => s.id === id);
   }
 
-  async save(session: Session): Promise<void> {
+  /** `activate` makes it the chat that opens next time: false for a chat working in the background. */
+  async save(session: Session, activate = true): Promise<void> {
     session.updatedAt = Date.now();
     const i = this.data.sessions.findIndex((s) => s.id === session.id);
     if (i >= 0) this.data.sessions[i] = session;
     else this.data.sessions.push(session);
     this.data.sessions = this.list().slice(0, MAX_SESSIONS);
-    this.data.activeId = session.id;
+    if (activate) this.data.activeId = session.id;
     await this.flush();
   }
 

@@ -11,6 +11,7 @@ import { McpTrustStore } from './storage/mcpTrust';
 import { SecretStore } from './storage/secrets';
 import { readSettings } from './storage/settings';
 import { SessionStore } from './storage/sessions';
+import { ChatChangeStore } from './safety/chatChanges';
 import { ChatViewProvider } from './webview/ChatViewProvider';
 import { ProposalContentProvider } from './webview/ProposalContentProvider';
 
@@ -18,7 +19,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const secrets = new SecretStore(context.secrets);
   // Chats belong to a project: storageUri is unique per workspace, so two windows never share history.
   // With no folder open there is no storageUri, so those chats get their own bucket.
-  const sessions = new SessionStore(context.storageUri?.fsPath ?? path.join(context.globalStorageUri.fsPath, 'no-workspace'));
+  const storageDir = context.storageUri?.fsPath ?? path.join(context.globalStorageUri.fsPath, 'no-workspace');
+  const sessions = new SessionStore(storageDir);
+  // What files held before a chat changed them, next to the chats themselves.
+  const chatChanges = new ChatChangeStore(path.join(storageDir, 'changes'));
   const output = vscode.window.createOutputChannel('M.I.T.R.A.M', { log: true });
   const logger = new Logger(output);
   const proposals = new ProposalContentProvider();
@@ -58,6 +62,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context.extensionUri,
     secrets,
     sessions,
+    chatChanges,
     proposals,
     context.globalState,
     commandRules,
