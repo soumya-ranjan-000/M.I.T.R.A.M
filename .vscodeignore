@@ -11,6 +11,7 @@ webview-ui/node_modules/**
 webview-ui/*.json
 webview-ui/*.ts
 .vscode/**
+.claude/**
 .gitignore
 PLAN.md
 esbuild.js
